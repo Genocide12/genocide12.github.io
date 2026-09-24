@@ -737,11 +737,10 @@
     // Content-Length: 0) на перегруженный IP — это троттлинг, а НЕ «нет
     // фильма»! Один и тот же фильм мигрирует 200 <-> 422 между запросами.
     // Поэтому: 404 = точно нет; 200 = есть; 422/прочее = НЕИЗВЕСТНО (null).
-    // Из-за троттлинга проверки обязаны быть щадящими (см. _embessBatch):
-    // именно 6 параллельных проверок v178 заваливали embess, и ПЛЕЕР
-    // пользователя получал 422 — «плеер перестал работать, ни с VPN ни без».
-    // Vercel-IP по-прежнему блокируются кодом 410 на ВСЁ → серверный
-    // _embed-check только fallback. Локальный кеш 7 дней в localStorage.
+    // v184: прямые проверки из браузера полностью убраны — они сами были
+    // причиной 422-шторма (см. комментарий у filterAvailable). Остались
+    // только пассивные источники фактов: общий кеш + write-back плеера.
+    // Локальный кеш 7 дней в localStorage.
     _availCache: null,
     getAvailMap: function() {
       if (this._availCache) return this._availCache;
@@ -761,72 +760,17 @@
     saveAvailMap: function() {
       try { localStorage.setItem('filmotiv_avail_v1', JSON.stringify({ map: this._availCache, ts: Date.now() })); } catch (_) {}
     },
-    // Прямая проверка доступности из браузера. 200 → true, 404 → false,
-    // прочее → null (неизвестно). Тело НЕ читаем (отменяем стрим — экономия).
-    // v183: хостов ШЕСТЬ (семейство embess: embess/atomics/marts/domem/namy,
-    // обнаружено в reyohoho kinoserver.py). 422-троттлинг гуляет между
-    // зеркалами — каждая проверка бьёт в следующий по кругу хост, при
-    // промахе пробует второй. Раньше все проверки били только в embess.
-    _availHosts: [
-      'https://api.embess.ws/embed/kp/',
-      'https://api1690380040.atomics.ws/embed/kp/',
-      'https://api.marts.ws/embed/kp/',
-      'https://api.domem.ws/embed/kp/',
-      'https://api.namy.ws/embed/kp/',
-      'https://api.atomics.ws/embed/kp/'
-    ],
-    _availHostIdx: 0,
-    _embessCheck: async function(id) {
-      function one(h) {
-        var ctrl = new AbortController();
-        var timer = setTimeout(function() { try { ctrl.abort(); } catch (_) {} }, 6000);
-        return fetch(h + encodeURIComponent(id), {
-          signal: ctrl.signal,
-          headers: { 'Accept': 'text/html' }
-        }).then(function(res) {
-          try { if (res.body && res.body.cancel) res.body.cancel(); } catch (_) {}
-          clearTimeout(timer);
-          if (res.status === 404) return false;
-          if (res.ok) return true;
-          return null;
-        }).catch(function() { clearTimeout(timer); return null; });
-      }
-      var h1 = this._availHosts[this._availHostIdx++ % this._availHosts.length];
-      var r1 = await one(h1);
-      if (r1 !== null) return r1;
-      var h2 = this._availHosts[this._availHostIdx++ % this._availHosts.length];
-      return one(h2);
-    },
-    // Прямая батч-проверка с ограничением параллельности
-    // Сессионная квота проверок embess (v182: 24 — раньше 120 добивали
-    // лимит embess на IP пользователя и ломали ПЛЕЕР: 422 на всё).
-    // Первая линия обороны — ОБЩИЙ серверный кеш _embed-cache (Supabase):
-    // результаты, собранные всеми пользователями, embess почти не нужен.
-    _embessQuota: 24,
-    _embessBatch: async function(ids) {
-      var out = {};
-      var idx = 0;
-      if (this._embessQuota <= 0) { console.log('[avail] quota exhausted — skip'); return out; }
-      // 2 параллельных воркера со стаггером 400мс: раньше 6 параллельных
-      // запросов триггерили 422-троттлинг embess и ломали ПЛЕЕР
-      // (одна проверка фильтра = до 60 запросов залпом!).
-      var N = Math.min(2, ids.length);
-      async function worker(delay) {
-        if (delay > 0) await new Promise(function(r) { setTimeout(r, delay); });
-        while (idx < ids.length) {
-          if (App.MOVIES._embessQuota <= 0) return;
-          var my = ids[idx++];
-          App.MOVIES._embessQuota--;
-          out[my] = await App.MOVIES._embessCheck(my);
-        }
-      }
-      var ws = [];
-      for (var i = 0; i < N; i++) ws.push(worker(i * 400));
-      await Promise.all(ws);
-      return out;
-    },
-    // Возвращает тот же массив, но без фильмов с КОНКРЕТНЫМ «нет в плеере».
-    // fail-open: ошибки/таймауты → фильм остаётся в выдаче.
+    // v184 — ФИЛЬТР «ФИЛЬМ ЕСТЬ В ПЛЕЕРЕ» БЕЗ ПРЯМЫХ ПРОВЕРОК.
+    // Прямые проверки embess из браузера (v178-v183, квоты 120→24) УДАЛЕНЫ:
+    // они раскаляли семейство зеркал с IP пользователя (до ~48 запросов за
+    // сессию, 2 хоста на проверку) → к открытию плеера ВСЕ хосты отвечали
+    // 422 → «плеер не загружается» (консоль пользователя 2026-09-25: шесть
+    // подряд 422 по всей цепочке). Теперь факты копятся пассивно и БЕЗ
+    // единого запроса к зеркалам:
+    //   • write-back при каждом успешном старте плеера (player.html);
+    //   • серверный _embed-fetch (пишет факт на своей стороне);
+    //   • общий кеш _embed-cache (Supabase), читается ниже.
+    // Неизвестные фильмы остаются в выдаче (fail-open).
     filterAvailable: async function(films) {
       if (!Array.isArray(films) || films.length === 0) return films || [];
       var map = this.getAvailMap();
@@ -837,93 +781,19 @@
         if (map[id] === undefined && ids.indexOf(id) === -1) ids.push(id);
       }
       if (ids.length > 0) {
-        var resolved = null;
-        var confirmed = {}; // только проверенные embess факты (для общего кеша)
-        var cb = 0;
-        try { cb = parseInt(sessionStorage.getItem('filmotiv_embess_cb') || '0', 10) || 0; } catch (_) {}
-        var cbActive = cb > 0 && (Date.now() - cb) < 10 * 60 * 1000;
-        // 0) ОБЩИЙ серверный кеш (v182): то, что уже проверили другие
-        // пользователи. Не тратит ни квоту, ни запросы embess.
         try {
           var cUrl = App.CORE.API_BASE + '/_embed-cache?ids=' + encodeURIComponent(ids.slice(0, 120).join(','));
           var cData = await App.MOVIES.apiGet(cUrl);
           if (cData && cData.available) {
-            resolved = {};
             for (var ck in cData.available) {
               if (Object.prototype.hasOwnProperty.call(cData.available, ck)) {
-                resolved[String(ck)] = cData.available[ck] === true;
-              }
-            }
-            console.log('[avail] shared cache hit:', Object.keys(resolved).length, '/', ids.length);
-          }
-        } catch (_) { /* сервер недоступен — идём дальше */ }
-        // 1) Прямая проверка embess из браузера (только незнакомые id,
-        // максимум 24 за сессию, 2 воркера со стаггером)
-        var unknown = [];
-        for (var ui = 0; ui < ids.length; ui++) {
-          if (!resolved || (resolved[ids[ui]] !== true && resolved[ids[ui]] !== false)) unknown.push(ids[ui]);
-        }
-        if (unknown.length > 0 && !cbActive) {
-          var batch = null;
-          try { batch = await this._embessBatch(unknown.slice(0, 24)); } catch (_) { batch = null; }
-          if (batch) {
-            if (!resolved) resolved = {};
-            var knownCnt = 0;
-            for (var bk in batch) {
-              if (!Object.prototype.hasOwnProperty.call(batch, bk)) continue;
-              resolved[bk] = batch[bk];
-              if (batch[bk] === true || batch[bk] === false) { confirmed[bk] = batch[bk]; knownCnt++; }
-            }
-            if (unknown.length >= 4 && knownCnt === 0) {
-              try { sessionStorage.setItem('filmotiv_embess_cb', String(Date.now())); } catch (_) {}
-              console.log('[avail] embess throttled (all 422/err) — circuit breaker ON for 10 min');
-            }
-          }
-        } else if (unknown.length > 0) {
-          console.log('[avail] circuit breaker active — fail-open');
-        }
-        // 1b) Подтверждённые факты делим со всеми (fire-and-forget):
-        // следующий пользователь возьмёт их из общего кеша и НЕ будет
-        // дёргать embess — именно серией таких проверок и ломался плеер.
-        var confCnt = 0; for (var fx in confirmed) { confCnt++; break; }
-        if (confCnt > 0) {
-          try {
-            App.CORE.apiPost('/api/kinopoisk?q=_embed-cache', { results: confirmed }).catch(function() {});
-          } catch (_) {}
-        }
-        // 2) Fallback: серверный батч (полезен, если embess ограничил браузер)
-        var allUnknown = resolved === null || unknown.every(function(x) { return resolved[x] === null || resolved[x] === undefined; });
-        if (allUnknown) {
-          try {
-            var url = App.CORE.API_BASE + '/_embed-check?ids=' + encodeURIComponent(unknown.slice(0, 60).join(','));
-            var data = await App.MOVIES.apiGet(url);
-            if (data && data.available) {
-              if (!resolved) resolved = {};
-              for (var k in data.available) {
-                if (Object.prototype.hasOwnProperty.call(data.available, k)) {
-                  resolved[String(k)] = data.available[k] !== false;
-                }
-              }
-            }
-          } catch (_) { /* fail-open */ }
-        }
-        if (resolved) {
-          // Кешируем любые известные результаты (404 = правда «нет в плеере»;
-          // 410-блоки датацентров и сбои уже превращены в true/fail-open).
-          var anyKnown = false;
-          for (var id3 in resolved) {
-            if (Object.prototype.hasOwnProperty.call(resolved, id3) && (resolved[id3] === true || resolved[id3] === false)) { anyKnown = true; break; }
-          }
-          if (anyKnown) {
-            for (var id4 in resolved) {
-              if (Object.prototype.hasOwnProperty.call(resolved, id4)) {
-                var v = resolved[id4];
-                map[String(id4)] = (v === false) ? false : true; // null → true (fail-open)
+                map[String(ck)] = cData.available[ck] === true;
               }
             }
             this.saveAvailMap();
+            console.log('[avail] shared cache facts:', Object.keys(cData.available).length, '/', ids.length);
           }
-        }
+        } catch (_) { /* сервер недоступен — fail-open */ }
       }
       var anyFalse = false;
       for (var j = 0; j < films.length; j++) {
@@ -932,8 +802,8 @@
       }
       if (!anyFalse) return films;
       var out = films.filter(function(f) {
-        var id = String(f.filmId || f.kinopoiskId || '');
-        return map[id] !== false;
+        var id2 = String(f.filmId || f.kinopoiskId || '');
+        return map[id2] !== false;
       });
       console.log('[avail] filtered out', films.length - out.length, 'films missing from player');
       return out;

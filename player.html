@@ -11,9 +11,9 @@
   <link rel="preconnect" href="https://api.embess.ws" crossorigin>
   <link rel="dns-prefetch" href="https://api.embess.ws">
   <script src="/i18n.js"></script>
-  <script src="/js/api-origin.js?v=183"></script>
-  <!-- Vercel Web Analytics (vanilla HTML CDN approach per Vercel docs) -->
-  <script defer src="https://cdn.vercel-insights.com/v1/script.js"></script>
+  <script src="/js/api-origin.js?v=184"></script>
+  <!-- Vercel Web Analytics убран из плеера (v184): EasyList/адблоки режут
+       cdn.vercel-insights.com/v1/script.js → ERR_BLOCKED_BY_CLIENT в консоли -->
   <title>Плеер</title>
   <script>
     // ====== Performance & error logging ======
@@ -365,48 +365,6 @@
     }
     .pe-btn:active { transform:scale(.96); }
     .pe-primary { background:linear-gradient(135deg,#8b5cf6,#ec4899); border:none; }
-
-    /* ====== Панель скачивания (TorAPI) ====== */
-    .dl-overlay {
-      position:absolute; inset:0; background:rgba(0,0,0,.75);
-      backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
-      display:none; align-items:flex-end; justify-content:center; z-index:40;
-    }
-    .dl-overlay.visible { display:flex; }
-    .dl-panel {
-      background:#101018; border:1px solid rgba(255,255,255,.12); border-bottom:none;
-      border-radius:24px 24px 0 0; width:100%; max-width:640px; max-height:88%;
-      display:flex; flex-direction:column; color:#fff; padding:16px 16px 12px;
-      box-sizing:border-box; animation:dlUp .25s ease-out;
-    }
-    @keyframes dlUp { from { transform:translateY(40px); opacity:0; } to { transform:none; opacity:1; } }
-    .dl-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:4px; }
-    .dl-title { font-size:18px; font-weight:800; letter-spacing:-.02em; }
-    .dl-x { background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.12); color:#fff; width:32px; height:32px; border-radius:10px; cursor:pointer; font-size:14px; }
-    .dl-sub { font-size:13px; color:rgba(255,255,255,.55); margin-bottom:10px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .dl-status { font-size:13px; font-weight:700; color:#a78bfa; margin-bottom:10px; }
-    .dl-results { overflow-y:auto; flex:1; }
-    .dl-group-title { font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:.08em; color:rgba(255,255,255,.45); margin:12px 0 6px; }
-    .dl-item {
-      background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.08);
-      border-radius:14px; padding:10px 12px; margin-bottom:6px; cursor:pointer;
-      transition:background .15s;
-    }
-    .dl-item:active { background:rgba(139,92,246,.18); }
-    .dl-name { font-size:14px; font-weight:600; line-height:1.35; }
-    .dl-meta { font-size:12px; color:rgba(255,255,255,.5); margin-top:3px; }
-    .dl-details { margin-top:8px; font-size:13px; }
-    .dl-magrow { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-    .dl-magbtn {
-      background:linear-gradient(135deg,#8b5cf6,#ec4899); color:#fff; text-decoration:none;
-      padding:9px 14px; border-radius:11px; font-size:13px; font-weight:800; display:inline-block;
-    }
-    .dl-copy {
-      background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.12); color:#fff;
-      padding:9px 12px; border-radius:11px; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit;
-    }
-    .dl-q { font-size:12px; color:rgba(255,255,255,.5); margin-top:6px; }
-    .dl-note { font-size:11px; color:rgba(255,255,255,.35); margin-top:10px; line-height:1.4; }
   </style>
 </head>
 <body>
@@ -414,7 +372,6 @@
     <span class="title" id="videoTitle">Загрузка...</span>
     <div class="btn-group">
       <button class="btn btn-fav" id="favBtn" title="В избранное">❤</button>
-      <button class="btn btn-dl" id="dlBtn" title="Скачать">⬇</button>
       <button class="btn btn-close" id="closeBtn" title="Закрыть">✕</button>
     </div>
   </div>
@@ -449,25 +406,11 @@
       <div class="pe-card">
         <div class="pe-emoji">🎬</div>
         <div class="pe-title" id="peTitle">Фильм недоступен в плеере</div>
-        <div class="pe-sub" id="peSub">Источник не вернул видео. Попробуйте скачать через торрент или откройте другой фильм.</div>
+        <div class="pe-sub" id="peSub">Источник не вернул видео. Уже пробуем другие зеркала автоматически — обычно помогает за пару минут.</div>
         <div class="pe-btns">
-          <button class="pe-btn pe-primary" id="peDownload">⬇ Скачать</button>
-          <button class="pe-btn" id="peRetry">⟳ Ещё раз</button>
+          <button class="pe-btn pe-primary" id="peRetry">⟳ Ещё раз</button>
           <button class="pe-btn" id="peClose">✕ Закрыть</button>
         </div>
-      </div>
-    </div>
-    <!-- Панель скачивания (TorAPI) -->
-    <div class="dl-overlay" id="dlOverlay">
-      <div class="dl-panel">
-        <div class="dl-head">
-          <span class="dl-title">⬇ Скачать</span>
-          <button class="dl-x" id="dlClose">✕</button>
-        </div>
-        <div class="dl-sub" id="dlSub"></div>
-        <div class="dl-status" id="dlStatus">Ищем раздачи…</div>
-        <div class="dl-results" id="dlResults"></div>
-        <div class="dl-note">RuTor — встроенный поиск (magnet без регистраций, работает всегда, при блокировке — через резервные прокси) + TorAPI-базы: Кинозал, RuTracker, NoNameClub. Свой TorAPI (Lifailon/TorAPI локально) добавляется в localStorage.filmotiv_torapi_bases, например http://localhost:8443.</div>
       </div>
     </div>
   </div>
@@ -996,19 +939,29 @@
     // ГУЛЯЕТ между хостами — когда embess «горячий», atomics отвечает 200,
     // и наоборот (проверено live: один и тот же kp_id 200↔422 в разные
     // минуты). Поэтому вместо ретраев в ОДИН хост — обход цепочки хостов.
-    // FlixCDN (tarantino.factorios.live, CORS *) — независимая инфраструктура,
-    // последняя линия. ВАЖНО: в v181/v182 новый loadPlayer был перекрыт
-    // старой копией функции ниже по файлу (function hoisting) — ретраи
-    // фактически никогда не работали. Дубль удалён, теперь цепочка здесь.
+    // ВАЖНО: в v181/v182 новый loadPlayer был перекрыт старой копией функции
+    // ниже по файлу (function hoisting) — ретраи фактически никогда не
+    // работали. Дубль удалён, теперь цепочка здесь.
+    //
+    // v184 — ТРИ ФАЗЫ (по логу пользователя: все 6 хостов 422 подряд, а
+    // FlixCDN-обёртка в srcdoc не стартовала видео — её API требует свой
+    // origin, плюс адблок резал её внутренний скрипт):
+    //   ФАЗА 1 — браузерные запросы к 6 зеркалам семейства (быстро, когда
+    //            IP «холодный»; фильтр доступности больше их НЕ греет);
+    //   ФАЗА 2 — серверный _embed-fetch (наш API): с Vercel-IP семейство
+    //            отдаёт 410, поэтому внутри — бесплатный прокси-егресс
+    //            (CONNECT-туннели). Не зависит от IP и адблока пользователя;
+    //   ФАЗА 3 — FlixCDN ПРЯМЫМ iframe (его плеер работает только со своим
+    //            origin; X-Frame-Options нет — проверено). Без бриджа.
     var PLAYER_PROVIDERS = [
       { label: 'embess',   fetch: 'https://api.embess.ws/embed/kp/',            base: 'https://api.embess.ws/' },
       { label: 'atomics0', fetch: 'https://api1690380040.atomics.ws/embed/kp/', base: 'https://api1690380040.atomics.ws/' },
       { label: 'marts',    fetch: 'https://api.marts.ws/embed/kp/',             base: 'https://api.marts.ws/' },
       { label: 'domem',    fetch: 'https://api.domem.ws/embed/kp/',             base: 'https://api.domem.ws/' },
       { label: 'namy',     fetch: 'https://api.namy.ws/embed/kp/',              base: 'https://api.namy.ws/' },
-      { label: 'atomics',  fetch: 'https://api.atomics.ws/embed/kp/',           base: 'https://api.atomics.ws/' },
-      { label: 'flixcdn',  fetch: 'https://tarantino.factorios.live/show/kinopoisk/', base: 'https://tarantino.factorios.live/' }
+      { label: 'atomics',  fetch: 'https://api.atomics.ws/embed/kp/',           base: 'https://api.atomics.ws/' }
     ];
+    var FLIXCDN_URL = 'https://tarantino.factorios.live/show/kinopoisk/';
     var __providerStart = 0; // ротация старта — не бьём всегда в один и тот же
 
     function providerFetch(p) {
@@ -1034,30 +987,54 @@
       } catch (_) {}
     }
 
-    // Обход всех провайдеров. onOk(html, provider) при первом успехе,
-    // onFail(allDefinitelyMissing) когда цепочка исчерпана. 422/5xx/сеть —
-    // тихо идём к следующему; 404 семейства считается «точно нет».
-    function tryChain(onOk, onFail) {
+    // Три фазы. onHtml(html, provider) — HTML для srcdoc (семейство или
+    // сервер), onIframe(url) — прямой iframe (FlixCDN), onFail(allMissing).
+    // 404 всего семейства = «точно нет» (каталог общий) — сервер/резерв не
+    // тратим. Иначе после семейства — сервер, потом FlixCDN.
+    function tryChain(onHtml, onIframe, onFail) {
       var start = __providerStart++ % PLAYER_PROVIDERS.length;
-      var familyCnt = PLAYER_PROVIDERS.length - 1; // flixcdn не считает 404
       var missing = 0;
       var i = 0;
+      function phase2() {
+        console.log('[player] серверный _embed-fetch…');
+        var url = '/api/kinopoisk?q=_embed-fetch&kp=' + encodeURIComponent(kid);
+        var req = window.FilmotivAPIOrigin
+          ? window.FilmotivAPIOrigin.apiFetch(url, null, 22000)
+          : fetch(url);
+        req.then(function(res) {
+          if (!res || !res.ok) throw new Error('server ' + (res ? res.status : 'null'));
+          return res.json();
+        }).then(function(d) {
+          if (d && d.ok && d.html && d.base) {
+            reportAvailable(true);
+            onHtml(d.html, { label: 'server:' + (d.via || 'direct'), base: d.base });
+          } else throw new Error('no html');
+        }).catch(function() { phase3(); });
+      }
+      function phase3() {
+        console.log('[player] FlixCDN → прямой iframe (без бриджа)');
+        onIframe(FLIXCDN_URL + encodeURIComponent(kid));
+      }
       (function next() {
-        if (i >= PLAYER_PROVIDERS.length) { onFail(missing >= familyCnt); return; }
+        if (i >= PLAYER_PROVIDERS.length) {
+          if (missing >= PLAYER_PROVIDERS.length) { onFail(true); return; }
+          phase2();
+          return;
+        }
         var p = PLAYER_PROVIDERS[(start + i) % PLAYER_PROVIDERS.length];
         i++;
         console.log('[player] provider', p.label, '→', p.fetch + kid);
         providerFetch(p).then(function(res) {
           if (res.ok) return res.text();
-          if (res.status === 404 && p.label !== 'flixcdn') missing++;
+          if (res.status === 404) missing++;
           throw new Error('HTTP ' + res.status);
         }).then(function(html) {
-          onOk(html, p);
+          onHtml(html, p);
         }).catch(function() { next(); });
       })();
     }
     function buildPlayerHtml(html, baseHref) {
-      var bridgeTag = '<script src="https://' + window.location.host + '/bridge.js?v=183' + (__bridgePremium ? '&premium=1' : '') + '"><\/script>';
+      var bridgeTag = '<script src="https://' + window.location.host + '/bridge.js?v=184' + (__bridgePremium ? '&premium=1' : '') + '"><\/script>';
       var baseTag = '<base href="' + (baseHref || 'https://api.embess.ws/') + '">';
       var referrerMeta = '<meta name="referrer" content="no-referrer">';
       if (/<head[^>]*>/i.test(html)) {
@@ -1077,7 +1054,18 @@
       iframe.removeAttribute('src');
       iframe.srcdoc = buildPlayerHtml(html, p.base);
       if (!quiet) { hidePlayerError(); loadingOverlay.classList.add('hidden'); }
-      if (p.label !== 'flixcdn') reportAvailable(true);
+      reportAvailable(true);
+    }
+    // Резервная линия (FlixCDN): прямой iframe, свой origin — их API работает,
+    // но бриджа там нет (resume/премиум-зачистка не действуют).
+    function onPlayerIframe(url) {
+      if (__playStarted) return;
+      console.log('[player] OK via flixcdn-iframe in', ((performance.now() - loadStartTime) / 1000).toFixed(2) + 's');
+      iframe.removeAttribute('srcdoc');
+      iframe.src = url;
+      hidePlayerError();
+      loadingOverlay.classList.add('hidden');
+      showToast('Подключён резервный источник видео', 2500);
     }
     function loadPlayer(premium) {
       __bridgePremium = !!premium;
@@ -1085,15 +1073,18 @@
       __bgRetry.gen++; // гасим возможный фоновый ретрай от прошлого запуска
       hidePlayerError();
       loadingOverlay.classList.remove('hidden');
+      iframe.removeAttribute('src'); // сброс прямого iframe прошлой попытки
       tryChain(function(html, p) {
         onPlayerHtmlReady(html, p, false);
+      }, function(url) {
+        onPlayerIframe(url);
       }, function(allMissing) {
         if (allMissing) {
-          console.warn('[player] все провайдеры семейства дали 404 → фильма нет');
+          console.warn('[player] все зеркала семейства дали 404 → фильма нет');
           showPlayerError('missing');
           return;
         }
-        console.warn('[player] все провайдеры перегружены → экран ошибки + фоновые ретраи');
+        console.warn('[player] семейство и сервер исчерпаны, flixcdn не подошёл → экран ошибки + фоновые ретраи');
         showPlayerError('throttled');
         startBgRetry();
       });
@@ -1115,7 +1106,7 @@
         tries++;
         if (tries > 12) {
           clearInterval(__bgRetry.timer); __bgRetry.timer = null;
-          if (sub) sub.textContent = 'Источник недоступен дольше обычного. Нажмите «Ещё раз» или скачайте фильм через торрент.';
+          if (sub) sub.textContent = 'Источник недоступен дольше обычного. Нажмите «Ещё раз» или попробуйте позже.';
           return;
         }
         if (sub) sub.textContent = 'Пробуем ещё раз автоматически (' + tries + '/12)…';
@@ -1124,6 +1115,12 @@
           if (__bgRetry.timer) { clearInterval(__bgRetry.timer); __bgRetry.timer = null; }
           console.log('[player] Bg retry OK via', p.label, 'after', tries, 'tries → srcdoc');
           onPlayerHtmlReady(html, p, false);
+          showToast('Плеер загрузился — приятного просмотра!', 2500);
+        }, function(url) {
+          if (gen !== __bgRetry.gen || __playStarted) return;
+          if (__bgRetry.timer) { clearInterval(__bgRetry.timer); __bgRetry.timer = null; }
+          console.log('[player] Bg retry → flixcdn-iframe после', tries, 'попыток');
+          onPlayerIframe(url);
           showToast('Плеер загрузился — приятного просмотра!', 2500);
         }, function() { /* фоновый тик — молча ждём следующего */ });
       }, 15000);
@@ -1338,7 +1335,7 @@
       var s = document.getElementById('peSub');
       if (kind === 'missing') {
         if (t) t.textContent = 'Фильма нет в онлайн-плеере';
-        if (s) s.textContent = 'Источник пока не добавил этот фильм. Скачайте через торрент или откройте другой фильм.';
+        if (s) s.textContent = 'Источник пока не добавил этот фильм. Откройте другой фильм или попробуйте позже.';
       } else {
         if (t) t.textContent = 'Плеер недоступен';
         if (s) s.textContent = 'Источник временно перегружен. Пробуем ещё раз автоматически — обычно проходит за пару минут.';
@@ -1351,270 +1348,8 @@
     }
     var peRetry = document.getElementById('peRetry');
     if (peRetry) peRetry.addEventListener('click', function() { hidePlayerError(); loadingOverlay.classList.remove('hidden'); loadPlayer(__bridgePremium); });
-    var peDl = document.getElementById('peDownload');
-    if (peDl) peDl.addEventListener('click', function() { hidePlayerError(); openDownloads(); });
     var peClose = document.getElementById('peClose');
     if (peClose) peClose.addEventListener('click', function() { window.location.href = '/'; });
-
-    // ====== Скачать (TorAPI: Кинозал, RuTracker, RuTor, NoNameClub) ======
-    // Пользовательский TorAPI-инстанс (клон Lifailon/TorAPI):
-    //   GET /api/search/title/all?query=...&year=...&page=0
-    //     → { RuTracker:[{Name,Id,Size,Seeds,Date,...}], Kinozal:[...], ... }
-    //   GET /api/search/id/{provider}?id=...
-    //     → [{ Name, Magnet, Hash, Torrent, Size, Quality, Audio, ... }]
-    // CORS у TorAPI открыт (Access-Control-Allow-Origin: *).
-    var filmYear = ''; // подтягивается из Кинопоиска при первом открытии панели
-    var yearFetched = false;
-    var TOR_BASES_KEY = 'filmotiv_torapi_bases';
-    function torBases() {
-      var def = ['https://kinozal-proxy-seven.vercel.app', 'https://torapi.vercel.app'];
-      try {
-        var extra = JSON.parse(localStorage.getItem(TOR_BASES_KEY) || 'null');
-        if (Array.isArray(extra)) {
-          var clean = [];
-          for (var i = 0; i < extra.length; i++) {
-            if (typeof extra[i] === 'string' && extra[i].indexOf('http') === 0 && clean.indexOf(extra[i]) === -1) clean.push(extra[i]);
-          }
-          for (var j = 0; j < def.length; j++) if (clean.indexOf(def[j]) === -1) clean.push(def[j]);
-          return clean;
-        }
-      } catch (_) {}
-      return def;
-    }
-    var torBase = null;
-    async function torProbe() {
-      if (torBase) return torBase;
-      var bases = torBases();
-      for (var i = 0; i < bases.length; i++) {
-        try {
-          var ctrl = new AbortController();
-          var t = setTimeout(function() { try { ctrl.abort(); } catch (_) {} }, 6000);
-          var r = await fetch(bases[i] + '/api/provider/list', { signal: ctrl.signal });
-          clearTimeout(t);
-          if (r.ok) { torBase = bases[i]; console.log('[dl] TorAPI:', torBase); return torBase; }
-        } catch (_) {}
-      }
-      return null;
-    }
-    async function ensureFilmYear() {
-      if (yearFetched) return filmYear;
-      yearFetched = true;
-      try {
-        var apiOrigin = window.FilmotivAPIOrigin && !window.FilmotivAPIOrigin.isVercelHost()
-          ? window.FilmotivAPIOrigin.VERCEL : '';
-        var r = await fetch(apiOrigin + '/api/kinopoisk?q=v2.2/films/' + encodeURIComponent(kid));
-        if (r.ok) {
-          var d = await r.json();
-          if (d && d.year) filmYear = String(d.year).match(/^\d{4}/) ? String(d.year).slice(0, 4) : '';
-        }
-      } catch (_) {}
-      return filmYear;
-    }
-    var TOR_GROUPS = [
-      { key: 'Kinozal', slug: 'kinozal', label: 'Кинозал' },
-      { key: 'RuTracker', slug: 'rutracker', label: 'RuTracker' },
-      { key: 'RuTor', slug: 'rutor', label: 'RuTor' },
-      { key: 'NoNameClub', slug: 'nonameclub', label: 'NoNameClub' }
-    ];
-    function dlStatus(msg) {
-      var el = document.getElementById('dlStatus');
-      if (el) el.textContent = msg;
-    }
-    async function openDownloads() {
-      var ov = document.getElementById('dlOverlay');
-      if (!ov) return;
-      ov.classList.add('visible');
-      var sub = document.getElementById('dlSub');
-      if (sub) sub.textContent = title;
-      var results = document.getElementById('dlResults');
-      if (results) results.innerHTML = '';
-      dlStatus('Ищем раздачи…');
-      var yr = await ensureFilmYear();
-      var total = 0;
-      // 1) ВСТРОЕННЫЙ серверный поиск (v182): наш /api/kinopoisk?q=_dl-search
-      // сам ходит на rutor.info и возвращает magnets — работает без
-      // TorAPI-инстансов (которые на Vercel не живы: трекеры режут их IP).
-      try {
-        var dlUrl = '/api/kinopoisk?q=_dl-search&title=' + encodeURIComponent(title) +
-                    (yr ? '&year=' + encodeURIComponent(yr) : '');
-        var r = await (window.FilmotivAPIOrigin
-          ? window.FilmotivAPIOrigin.apiFetch(dlUrl, null, 22000)
-          : fetch(dlUrl));
-        if (r.ok) {
-          var d = await r.json();
-          if (d && d.ok && Array.isArray(d.results) && d.results.length > 0 && results) {
-            results.appendChild(renderRutorList(d.results));
-            total += d.results.length;
-          }
-        }
-      } catch (_) {}
-      // 2) TorAPI-инстансы (пользовательский + адреса из localStorage)
-      var base = await torProbe();
-      if (base) {
-        try {
-          var q = base + '/api/search/title/all?query=' + encodeURIComponent(title) +
-                  (yr ? '&year=' + encodeURIComponent(yr) : '') + '&page=0';
-          var r2 = await fetch(q);
-          if (r2.ok) {
-            var data = await r2.json();
-            if (results) {
-              TOR_GROUPS.forEach(function(g) {
-                var arr = (data && data[g.key]) || [];
-                if (!Array.isArray(arr) || arr.length === 0) return;
-                total += arr.length;
-                results.appendChild(renderGroup(g, arr));
-              });
-            }
-          }
-        } catch (_) {}
-      }
-      if (total > 0) {
-        dlStatus('Найдено раздач: ' + total + (yr ? ' · год ' + yr : ''));
-      } else if (!base) {
-        dlStatus('Встроенный поиск недоступен (сеть или прокси-резерв исчерпан). Свой TorAPI (Lifailon/TorAPI локально) добавьте в localStorage.filmotiv_torapi_bases, например http://localhost:8443 — и откройте панель снова.');
-      } else {
-        dlStatus('Ничего не найдено по запросу «' + title + '»');
-      }
-    }
-    // Плоский список раздач rutor: magnet/torrent уже в руке, разворачивать
-    // нечего — рендерим сразу с кнопками.
-    function renderRutorList(arr) {
-      var wrap = document.createElement('div');
-      wrap.className = 'dl-group';
-      var h = document.createElement('div');
-      h.className = 'dl-group-title';
-      h.textContent = 'RuTor — встроенный поиск (' + arr.length + ')';
-      wrap.appendChild(h);
-      arr.slice(0, 12).forEach(function(item) {
-        var row = document.createElement('div');
-        row.className = 'dl-item';
-        var nm = document.createElement('div');
-        nm.className = 'dl-name';
-        nm.textContent = item.name || 'Раздача';
-        var meta = document.createElement('div');
-        meta.className = 'dl-meta';
-        meta.textContent = [item.size, item.seeds ? 'сидов: ' + item.seeds : '', item.date || ''].filter(Boolean).join(' · ');
-        row.appendChild(nm);
-        row.appendChild(meta);
-        var magRow = document.createElement('div');
-        magRow.className = 'dl-magrow';
-        var a = document.createElement('a');
-        a.className = 'dl-magbtn';
-        if (item.magnet) { a.href = item.magnet; a.textContent = '🧲 Открыть magnet'; }
-        else if (item.torrent) { a.href = item.torrent; a.textContent = '⬇ Скачать .torrent'; }
-        a.target = '_blank';
-        a.rel = 'noopener';
-        magRow.appendChild(a);
-        if (item.magnet) {
-          var cp = document.createElement('button');
-          cp.className = 'dl-copy';
-          cp.textContent = 'Копировать';
-          cp.addEventListener('click', function(e) {
-            e.stopPropagation();
-            try {
-              navigator.clipboard.writeText(item.magnet);
-              cp.textContent = '✓ Скопировано';
-              setTimeout(function() { cp.textContent = 'Копировать'; }, 1500);
-            } catch (_) {}
-          });
-          magRow.appendChild(cp);
-        }
-        row.appendChild(magRow);
-        wrap.appendChild(row);
-      });
-      return wrap;
-    }
-    function renderGroup(g, arr) {
-      var wrap = document.createElement('div');
-      wrap.className = 'dl-group';
-      var h = document.createElement('div');
-      h.className = 'dl-group-title';
-      h.textContent = g.label + ' (' + arr.length + ')';
-      wrap.appendChild(h);
-      arr.slice(0, 12).forEach(function(item) {
-        var row = document.createElement('div');
-        row.className = 'dl-item';
-        var nm = document.createElement('div');
-        nm.className = 'dl-name';
-        nm.textContent = item.Name || item.name || 'Раздача';
-        var meta = document.createElement('div');
-        meta.className = 'dl-meta';
-        meta.textContent = [item.Size, item.Seeds ? 'сидов: ' + item.Seeds : '', item.Date || ''].filter(Boolean).join(' · ');
-        row.appendChild(nm);
-        row.appendChild(meta);
-        var expand = document.createElement('div');
-        expand.className = 'dl-details';
-        expand.style.display = 'none';
-        row.appendChild(expand);
-        var opened = false;
-        row.addEventListener('click', async function() {
-          if (expand.style.display === 'block') { expand.style.display = 'none'; return; }
-          if (opened) { expand.style.display = 'block'; return; }
-          opened = true;
-          expand.style.display = 'block';
-          expand.textContent = 'Загрузка магнита…';
-          try {
-            var r = await fetch(torBase + '/api/search/id/' + g.slug + '?id=' + encodeURIComponent(item.Id));
-            if (!r.ok) throw new Error('HTTP ' + r.status);
-            var d = await r.json();
-            var it = Array.isArray(d) ? d[0] : d;
-            expand.innerHTML = '';
-            if (!it || (!it.Magnet && !it.Torrent)) {
-              expand.textContent = 'Магнит недоступен для этой раздачи';
-              return;
-            }
-            var magRow = document.createElement('div');
-            magRow.className = 'dl-magrow';
-            var a = document.createElement('a');
-            a.className = 'dl-magbtn';
-            if (it.Magnet) { a.href = it.Magnet; a.textContent = '🧲 Открыть magnet'; }
-            else if (it.Torrent) { a.href = it.Torrent; a.textContent = '⬇ Скачать .torrent'; }
-            a.target = '_blank';
-            a.rel = 'noopener';
-            magRow.appendChild(a);
-            if (it.Magnet) {
-              var cp = document.createElement('button');
-              cp.className = 'dl-copy';
-              cp.textContent = 'Копировать';
-              cp.addEventListener('click', function(e) {
-                e.stopPropagation();
-                try {
-                  navigator.clipboard.writeText(it.Magnet);
-                  cp.textContent = '✓ Скопировано';
-                  setTimeout(function() { cp.textContent = 'Копировать'; }, 1500);
-                } catch (_) {}
-              });
-              magRow.appendChild(cp);
-            }
-            expand.appendChild(magRow);
-            var extra = [it.Quality, it.Audio].filter(Boolean).join(' · ');
-            if (extra) {
-              var q = document.createElement('div');
-              q.className = 'dl-q';
-              q.textContent = extra;
-              expand.appendChild(q);
-            }
-          } catch (e) {
-            expand.textContent = 'Ошибка: ' + (e && e.message ? e.message : 'сеть');
-          }
-        });
-        wrap.appendChild(row);
-      });
-      return wrap;
-    }
-    function closeDownloads() {
-      var ov = document.getElementById('dlOverlay');
-      if (ov) ov.classList.remove('visible');
-    }
-    var dlBtn = document.getElementById('dlBtn');
-    if (dlBtn) dlBtn.addEventListener('click', openDownloads);
-    var dlCloseBtn = document.getElementById('dlClose');
-    if (dlCloseBtn) dlCloseBtn.addEventListener('click', closeDownloads);
-    var dlOv = document.getElementById('dlOverlay');
-    if (dlOv) dlOv.addEventListener('click', function(e) { if (e.target === dlOv) closeDownloads(); });
-    // Кнопка «Скачать» в шапке — чуть приглушённый стиль уже есть (.btn);
-    // подсветим градиентом как премиальную:
-    if (dlBtn) dlBtn.style.background = 'rgba(139,92,246,0.18)';
   </script>
 </body>
 </html>
