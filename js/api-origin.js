@@ -1,0 +1,156 @@
+// Filmotiv API Origin resolver — единый слой выбора происхождения API.
+//
+// ПРОБЛЕМА, которую решает (2026-09-24, отчёт пользователя):
+//   На зеркале genocide12.github.io все fetch('/api/...') уходили на сам
+//   GitHub Pages → 404/405 (GitHub Pages не выполняет serverless-функции).
+//   Ротация была только у GET (apiGet в app.js) — POST (/api/me, /api/track)
+//   падали всегда. Плюс filmotiv.vercel.app частично блокируется из РФ,
+//   а URL деплоя filmotiv-5sp8sjewa-genocide12s-projects.vercel.app —
+//   ДОСТУПЕН (проверено пользователем) → добавлен как резервное происхождение.
+//
+// Решение:
+//   1) apiFetch(path, opts) — fetch с автоматической ротацией происхождения
+//      для ЛЮБЫХ методов (GET/POST). Рабочее происхождение «залипает»
+//      в localStorage на 1 час.
+//   2) watchRedirect() — на vercel-хостах, если /api/health недоступен
+//      дважды подряд, показываем плашку и автоматически переходим на зеркало
+//      genocide12.github.io (запрос пользователя: «автоматическое
+//      перенаправление на github.io с vercel, если последний недоступен»).
+//      Техническое ограничение: если ХОСТ полностью заблокирован (страница
+//      вообще не открылась), JS не выполнится — тут помогает только зеркало.
+(function() {
+  'use strict';
+
+  var VERCEL = 'https://filmotiv.vercel.app';
+  var BACKUP = 'https://filmotiv-5sp8sjewa-genocide12s-projects.vercel.app';
+  var MIRROR = 'https://genocide12.github.io/';
+  var LS_KEY = 'filmotiv_api_origin_v2';
+  var TTL = 60 * 60 * 1000; // 1 час
+
+  function isVercelHost() {
+    var h = location.hostname || '';
+    return h === 'localhost' || h === '127.0.0.1' ||
+           h.indexOf('vercel.app') !== -1 ||
+           h.indexOf('vercel.app.') !== -1; // preview-домены
+  }
+
+  function cachedOrigin() {
+    try {
+      var v = JSON.parse(localStorage.getItem(LS_KEY) || 'null');
+      if (v && v.origin && Date.now() - v.ts < TTL) return v.origin;
+    } catch (_) {}
+    return null;
+  }
+
+  function storeOrigin(o) {
+    try { localStorage.setItem(LS_KEY, JSON.stringify({ origin: o, ts: Date.now() })); } catch (_) {}
+  }
+
+  // Список кандидатов. На vercel-хостах '' (same-origin) всегда первый.
+  function origins() {
+    var list = isVercelHost() ? ['', VERCEL, BACKUP] : [VERCEL, BACKUP];
+    var c = cachedOrigin();
+    if (c && c !== '') {
+      var i = list.indexOf(c);
+      if (i > 0) { list.splice(i, 1); list.unshift(c); }
+    }
+    return list;
+  }
+
+  function urlFor(o, path) { return (o === '' ? '' : o) + path; }
+
+  // fetch с ротацией. Возвращает Response или null (все попытки исчерпаны).
+  async function apiFetch(path, opts, timeoutMs) {
+    opts = opts || {};
+    var list = origins();
+    var maxTries = Math.min(list.length, 3);
+    var lastStatus = 0;
+    for (var a = 0; a < maxTries; a++) {
+      var o = list[a];
+      if (o === undefined) break;
+      var ctrl = (typeof AbortController === 'function') ? new AbortController() : null;
+      var timer = ctrl ? setTimeout(function() { try { ctrl.abort(); } catch (_) {} }, timeoutMs || 9000) : null;
+      try {
+        var init = ctrl ? Object.assign({}, opts, { signal: ctrl.signal }) : opts;
+        var res = await fetch(urlFor(o, path), init);
+        if (timer) clearTimeout(timer);
+        if (res.status >= 500 || res.status === 408 || res.status === 429) {
+          lastStatus = res.status;
+          continue; // сервер/функция перегружена — пробуем другое происхождение
+        }
+        if (o !== '') storeOrigin(o);
+        return res;
+      } catch (e) {
+        if (timer) clearTimeout(timer);
+        lastStatus = 0;
+        continue; // сеть/DNS/блокировка — следующее происхождение
+      }
+    }
+    if (lastStatus) console.warn('[origin] все происхождения недоступны, последний статус', lastStatus);
+    return null;
+  }
+
+  // Абсолютный URL для sendBeacon (не ждёт ответа, ротация невозможна —
+  // берём залипшее происхождение или первое доступное).
+  function beaconUrl(path) {
+    if (isVercelHost()) return path;
+    var c = cachedOrigin();
+    return (c && c !== '' ? c : VERCEL) + path;
+  }
+
+  // Авто-переход на зеркало при недоступности прод-API (только на vercel).
+  function watchRedirect() {
+    if (!/(^|\.)vercel\.app$/.test(location.hostname)) return;
+    var tries = 0;
+    function probe() {
+      var ctrl = (typeof AbortController === 'function') ? new AbortController() : null;
+      var timer = ctrl ? setTimeout(function() { try { ctrl.abort(); } catch (_) {} }, 4000) : null;
+      fetch('/api/health', ctrl ? { signal: ctrl.signal, cache: 'no-store' } : { cache: 'no-store' })
+        .then(function(r) {
+          if (timer) clearTimeout(timer);
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          console.log('[origin] prod healthy');
+        })
+        .catch(function() {
+          if (timer) clearTimeout(timer);
+          tries++;
+          if (tries >= 2) fallbackBar();
+          else setTimeout(probe, 2500);
+        });
+    }
+    function fallbackBar() {
+      console.warn('[origin] prod API недоступен → зеркало через 5с');
+      try {
+        var el = document.createElement('div');
+        el.id = 'mirrorFallbackBar';
+        el.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:2147483647;background:rgba(13,13,22,.97);color:#fff;font:600 13px/1.5 system-ui,sans-serif;padding:12px 16px;text-align:center;border-top:1px solid rgba(255,255,255,.14)';
+        el.innerHTML = '⚠️ Прод-сервер недоступен. Переходим на <a href="' + MIRROR + '" style="color:#a78bfa;font-weight:800;text-decoration:underline">зеркало</a> через <b id="mirrorFbCnt">5</b> с…';
+        var mount = document.body || document.documentElement;
+        mount.appendChild(el);
+        var n = 5;
+        var iv = setInterval(function() {
+          n--;
+          var c = document.getElementById('mirrorFbCnt');
+          if (c) c.textContent = n;
+          if (n <= 0) { clearInterval(iv); try { location.replace(MIRROR); } catch (_) { location.href = MIRROR; } }
+        }, 1000);
+      } catch (_) {
+        try { location.replace(MIRROR); } catch (_) {}
+      }
+    }
+    if (document.readyState === 'complete') setTimeout(probe, 1500);
+    else window.addEventListener('load', function() { setTimeout(probe, 1500); }, { once: true });
+  }
+
+  window.FilmotivAPIOrigin = {
+    VERCEL: VERCEL,
+    BACKUP: BACKUP,
+    MIRROR: MIRROR,
+    isVercelHost: isVercelHost,
+    origins: origins,
+    apiFetch: apiFetch,
+    beaconUrl: beaconUrl,
+    watchRedirect: watchRedirect
+  };
+  watchRedirect();
+})();

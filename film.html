@@ -208,6 +208,7 @@
   }
   </script>
 
+  <script src="/js/api-origin.js?v=181"></script>
   <script>
     // Extract film ID from URL (?id=251733 or /film/251733)
     var params = new URLSearchParams(window.location.search);
@@ -241,7 +242,7 @@
 
     // Fetch film details for SEO + display
     if (filmId && /^\d+$/.test(filmId)) {
-      fetch('/api/kinopoisk?q=v2.2/films/' + encodeURIComponent(filmId))
+      fetch((window.FilmotivAPIOrigin && !window.FilmotivAPIOrigin.isVercelHost() ? window.FilmotivAPIOrigin.VERCEL : '') + '/api/kinopoisk?q=v2.2/films/' + encodeURIComponent(filmId))
         .then(function(res) { return res.ok ? res.json() : null; })
         .then(function(data) {
           if (!data) { document.getElementById('loadingStatus').textContent = ''; return; }

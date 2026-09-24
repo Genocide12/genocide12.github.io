@@ -16,15 +16,22 @@
     // отдаёт статику (GitHub из РФ доступен), а API строится по цепочке:
     //   1) same-origin (на vercel — это и есть прод)
     //   2) vercel напрямую (с зеркала; работает, если IP не заблокирован)
-    //   3) Cloudflare-прокси allorigins (доступен из РФ, IP 188.114.x.x)
-    // Рабочее происхождение «залипает» на сессию (sessionStorage).
+    //   3) URL деплоя filmotiv-5sp8sjewa-... (другой edge-IP, доступен
+    //      из РФ без VPN — подтверждено пользователем 2026-09-24)
+    //   4) Cloudflare-прокси allorigins (доступен из РФ, IP 188.114.x.x)
+    // Рабочее происхождение «залипает» (sessionStorage + api-origin.js
+    // держит час в localStorage). POST-запросы ротируются тем же способом
+    // через window.FilmotivAPIOrigin.apiFetch (загружается перед app.js).
     API_ORIGIN_VERCEL: 'https://filmotiv.vercel.app',
+    API_ORIGIN_BACKUP: 'https://filmotiv-5sp8sjewa-genocide12s-projects.vercel.app',
     API_PROXY_PREFIX: 'https://api.allorigins.win/raw?url=',
     apiOrigins: function() {
       if (this._apiOrigins) return this._apiOrigins;
       var h = (location.hostname || '');
       var isProd = h.indexOf('vercel.app') !== -1 || h === 'localhost' || h.indexOf('127.0.0.1') !== -1;
-      this._apiOrigins = isProd ? [''] : [this.API_ORIGIN_VERCEL, 'PROXY:' + this.API_PROXY_PREFIX];
+      this._apiOrigins = isProd
+        ? ['']
+        : [this.API_ORIGIN_VERCEL, this.API_ORIGIN_BACKUP, 'PROXY:' + this.API_PROXY_PREFIX];
       return this._apiOrigins;
     },
     stickyOrigin: function() {
@@ -37,6 +44,21 @@
       if (origin === '') return url;
       if (origin.indexOf('PROXY:') === 0) return origin.slice(6) + encodeURIComponent(this.API_ORIGIN_VERCEL + url);
       return origin + url;
+    },
+    // POST/любые fetch к /api/* с ротацией происхождения (зеркало → vercel).
+    // api-origin.js должен быть загружен РАНЬШЕ app.js (см. index.html).
+    apiSend: function(path, opts) {
+      if (window.FilmotivAPIOrigin) return window.FilmotivAPIOrigin.apiFetch(path, opts);
+      return fetch(path, opts);
+    },
+    // POST JSON + удобный возврат Response|null
+    apiPost: function(path, bodyObj) {
+      return this.apiSend(path, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(bodyObj || {})
+      });
     },
     // Собрать URL API с учётом «залипшего» происхождения (для fetch вне apiGet:
     // постеры, предзагрев и т.п.)
@@ -338,13 +360,8 @@
       if (!tgId && !tgUsername) return;
       if (tg && tg.initData) return;
       try {
-        var res = await fetch('/api/me', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ userId: tgId, username: tgUsername, initData: App.CORE.getTgInitData() })
-        });
-        if (!res.ok) return; // network error — don't reload
+        var res = await App.CORE.apiPost('/api/me', { userId: tgId, username: tgUsername, initData: App.CORE.getTgInitData() });
+        if (!res || !res.ok) return; // network error — don't reload
         var data = await res.json();
         // Update premium badge based on server response
         if (typeof data.is_premium !== 'undefined') {
@@ -390,9 +407,10 @@
                 platform: 'browser'
               });
               if (navigator.sendBeacon) {
-                navigator.sendBeacon('/api/track', new Blob([body], { type: 'application/json' }));
+                var bUrl = window.FilmotivAPIOrigin ? window.FilmotivAPIOrigin.beaconUrl('/api/track') : '/api/track';
+                navigator.sendBeacon(bUrl, new Blob([body], { type: 'application/json' }));
               } else {
-                fetch('/api/track', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body, keepalive: true });
+                App.CORE.apiSend('/api/track', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body, keepalive: true });
               }
             });
           }
@@ -715,10 +733,15 @@
     // Задача пользователя: «в выдаче часто фильмы, которых в плеере нет!
     // особенно в Новинках — добавь проверку».
     // Плеер играет через api.embess.ws/embed/kp/{id}: 200 — есть, 404 — нет.
-    // ВАЖНО: embess блокирует IP дата-центров (Vercel) кодом 410 на ВСЁ,
-    // поэтому проверяем НАПРЯМУЮ из браузера (CORS у embess разрешён, *),
-    // тем же путём, что и сам плеер. Серверный _embed-check — fallback.
-    // Локальный кеш на 24ч в localStorage, чтобы не дёргать сеть зря.
+    // ВАЖНО (диагностика 2026-09-24): embess ОТВЕЧАЕТ 422 (пустое тело,
+    // Content-Length: 0) на перегруженный IP — это троттлинг, а НЕ «нет
+    // фильма»! Один и тот же фильм мигрирует 200 <-> 422 между запросами.
+    // Поэтому: 404 = точно нет; 200 = есть; 422/прочее = НЕИЗВЕСТНО (null).
+    // Из-за троттлинга проверки обязаны быть щадящими (см. _embessBatch):
+    // именно 6 параллельных проверок v178 заваливали embess, и ПЛЕЕР
+    // пользователя получал 422 — «плеер перестал работать, ни с VPN ни без».
+    // Vercel-IP по-прежнему блокируются кодом 410 на ВСЁ → серверный
+    // _embed-check только fallback. Локальный кеш 7 дней в localStorage.
     _availCache: null,
     getAvailMap: function() {
       if (this._availCache) return this._availCache;
@@ -726,7 +749,7 @@
         var raw = localStorage.getItem('filmotiv_avail_v1');
         if (raw) {
           var p = JSON.parse(raw);
-          if (p && p.map && Date.now() - p.ts < 24 * 60 * 60 * 1000) {
+          if (p && p.map && Date.now() - p.ts < 7 * 24 * 60 * 60 * 1000) {
             this._availCache = p.map;
             return this._availCache;
           }
@@ -759,18 +782,27 @@
       }
     },
     // Прямая батч-проверка с ограничением параллельности
+    // Сессионная квота проверок embess (щадящий режим v181)
+    _embessQuota: 120,
     _embessBatch: async function(ids) {
       var out = {};
       var idx = 0;
-      var N = Math.min(6, ids.length);
-      async function worker() {
+      if (this._embessQuota <= 0) { console.log('[avail] quota exhausted — skip'); return out; }
+      // 2 параллельных воркера со стаггером 400мс: раньше 6 параллельных
+      // запросов триггерили 422-троттлинг embess и ломали ПЛЕЕР
+      // (одна проверка фильтра = до 60 запросов залпом!).
+      var N = Math.min(2, ids.length);
+      async function worker(delay) {
+        if (delay > 0) await new Promise(function(r) { setTimeout(r, delay); });
         while (idx < ids.length) {
+          if (App.MOVIES._embessQuota <= 0) return;
           var my = ids[idx++];
+          App.MOVIES._embessQuota--;
           out[my] = await App.MOVIES._embessCheck(my);
         }
       }
       var ws = [];
-      for (var i = 0; i < N; i++) ws.push(worker());
+      for (var i = 0; i < N; i++) ws.push(worker(i * 400));
       await Promise.all(ws);
       return out;
     },
@@ -787,8 +819,26 @@
       }
       if (ids.length > 0) {
         var resolved = null;
+        // Circuit breaker: если предыдущий батч вернул ТОЛЬКО 422/сбои
+        // (троттлинг embess) — не долбим embess 10 минут, чтобы не ломать
+        // плеер пользователю. Fail-open: считаем всё доступным.
+        var cb = 0;
+        try { cb = parseInt(sessionStorage.getItem('filmotiv_embess_cb') || '0', 10) || 0; } catch (_) {}
+        var cbActive = cb > 0 && (Date.now() - cb) < 10 * 60 * 1000;
         // 1) Прямая проверка embess из браузера (как делает плеер)
-        try { resolved = await this._embessBatch(ids.slice(0, 60)); } catch (_) { resolved = null; }
+        if (!cbActive) {
+          try { resolved = await this._embessBatch(ids.slice(0, 60)); } catch (_) { resolved = null; }
+          var knownCnt = 0;
+          if (resolved) for (var rk in resolved) {
+            if (Object.prototype.hasOwnProperty.call(resolved, rk) && resolved[rk] !== null && resolved[rk] !== undefined) knownCnt++;
+          }
+          if (ids.length >= 4 && knownCnt === 0) {
+            try { sessionStorage.setItem('filmotiv_embess_cb', String(Date.now())); } catch (_) {}
+            console.log('[avail] embess throttled (all 422/err) — circuit breaker ON for 10 min');
+          }
+        } else {
+          console.log('[avail] circuit breaker active — fail-open');
+        }
         // 2) Fallback: серверный батч (полезен, если embess ограничил браузер)
         var allUnknown = resolved === null || ids.every(function(x) { return resolved[x] === null || resolved[x] === undefined; });
         if (allUnknown) {
@@ -867,8 +917,10 @@
     getWeeklyNew: async function() {
       if (App.MOVIES.weeklyNewCache) return App.MOVIES.weeklyNewCache;
       try {
-        var res = await fetch('/api/new-films', { headers: { 'Content-Type': 'application/json' } });
-        if (res.ok) {
+        // apiGet: ротация происхождения (важно на зеркале — раньше был
+        // голый fetch('/api/new-films') → 404 на genocide12.github.io)
+        var res = await App.MOVIES.apiGet('/api/new-films');
+        if (res && res.ok) {
           var data = await res.json();
           if (data && Array.isArray(data.films) && data.films.length > 0) {
             App.MOVIES.weeklyNewCache = data.films;
@@ -1157,13 +1209,8 @@
       // Don't block guests — try /api/me anyway, session cookie may work
       // even if localStorage doesn't have tg_user_id
       try {
-        var res = await fetch('/api/me', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ userId: uid, initData: initData })
-        });
-        if (!res.ok) throw new Error('HTTP ' + res.status);
+        var res = await App.CORE.apiPost('/api/me', { userId: uid, initData: initData });
+        if (!res || !res.ok) throw new Error('HTTP ' + (res ? res.status : 'null'));
         var data = await res.json();
         // If user doesn't exist or is guest with no server data
         if (!data.exists && !data.favorites) {
@@ -1299,7 +1346,7 @@
         if (payload.rating) body.rating = payload.rating;
         if (payload.query) body.query = payload.query;
         if (payload.path) body.path = payload.path;
-        await fetch('/api/track', {
+        await App.CORE.apiSend('/api/track', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
@@ -1316,13 +1363,8 @@
 
         // Always try server — session cookie may work even for web_* guests
         try {
-          var res = await fetch('/api/me', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ initData: initData, userId: uid })
-          });
-          if (res.ok) {
+          var res = await App.CORE.apiPost('/api/me', { initData: initData, userId: uid });
+          if (res && res.ok) {
             var data = await res.json();
             if (data.last_film) filmData = data.last_film;
             // Update premium badge (covers Mini App path where checkAuth
@@ -1427,12 +1469,11 @@
       // Tier 2: after 3s idle — top250 + new (only if user is idle, not blocking)
       setTimeout(function() {
         try {
-          fetch('/api/kinopoisk?q=v2.2/films/top&type=TOP_250_BEST_FILMS&page=1')
-            .then(function(r) { return r.ok ? r.json() : null; })
+          // apiGet: ротация происхождения (голый fetch давал 404 на зеркале)
+          App.MOVIES.apiGet(App.CORE.API_BASE + '/v2.2/films/top?type=TOP_250_BEST_FILMS&page=1')
             .then(function(data) { if (data) App.TRACKING.cacheFilms('top250', 1, data); })
             .catch(function(){});
-          fetch('/api/kinopoisk?q=v2.2/films&order=NUM_VOTE&type=FILM&ratingFrom=0&ratingTo=10&yearFrom=' + year + '&yearTo=' + year + '&page=1')
-            .then(function(r) { return r.ok ? r.json() : null; })
+          App.MOVIES.apiGet(App.CORE.API_BASE + '/v2.2/films?order=NUM_VOTE&type=FILM&ratingFrom=0&ratingTo=10&yearFrom=' + year + '&yearTo=' + year + '&page=1')
             .then(function(data) { if (data) App.TRACKING.cacheFilms('new', 1, data); })
             .catch(function(){});
         } catch(_) {}
@@ -1527,13 +1568,8 @@
     try {
       var uid = App.CORE.getUserId();
       var initData = App.CORE.getTgInitData();
-      var res = await fetch('/api/me', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ userId: uid, initData: initData })
-      });
-      if (!res.ok) return;
+      var res = await App.CORE.apiPost('/api/me', { userId: uid, initData: initData });
+      if (!res || !res.ok) return;
       var data = await res.json();
       if (!data.admin_messages || data.admin_messages.length === 0) return;
       // Check if we already showed this message (by timestamp)
@@ -2022,8 +2058,9 @@
     } else if (filmId) {
       fipDesc.textContent = 'Загрузка...';
       fipDesc.style.display = 'block';
-      fetch('/api/kinopoisk?q=v2.2/films/' + encodeURIComponent(filmId))
-        .then(function(r) { return r.ok ? r.json() : null; })
+      // apiGet: ротация происхождения (голый fetch давал 404 на зеркале)
+      App.MOVIES.apiGet(App.CORE.API_BASE + '/v2.2/films/' + encodeURIComponent(filmId))
+        .then(function(r) { return r ? r.json() : null; })
         .then(function(d) {
           if (!d) { fipDesc.textContent = 'Описание недоступно'; return; }
           var fullDesc = d.shortDescription || d.description || '';

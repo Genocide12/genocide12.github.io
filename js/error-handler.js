@@ -104,8 +104,13 @@
             })()
           };
           var body = JSON.stringify(payload);
+          // На зеркале (github.io) относительный путь попадает на GitHub
+          // Pages → 405. Отправляем на рабочее vercel-происхождение.
           if (navigator.sendBeacon) {
-            navigator.sendBeacon('/api/track', new Blob([body], { type: 'application/json' }));
+            var bUrl = window.FilmotivAPIOrigin ? window.FilmotivAPIOrigin.beaconUrl('/api/track') : '/api/track';
+            navigator.sendBeacon(bUrl, new Blob([body], { type: 'application/json' }));
+          } else if (window.FilmotivAPIOrigin) {
+            window.FilmotivAPIOrigin.apiFetch('/api/track', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body, keepalive: true }).catch(function() {});
           } else {
             fetch('/api/track', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body, keepalive: true }).catch(function() {});
           }

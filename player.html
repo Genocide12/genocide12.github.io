@@ -11,6 +11,7 @@
   <link rel="preconnect" href="https://api.embess.ws" crossorigin>
   <link rel="dns-prefetch" href="https://api.embess.ws">
   <script src="/i18n.js"></script>
+  <script src="/js/api-origin.js?v=181"></script>
   <!-- Vercel Web Analytics (vanilla HTML CDN approach per Vercel docs) -->
   <script defer src="https://cdn.vercel-insights.com/v1/script.js"></script>
   <title>Плеер</title>
@@ -340,6 +341,72 @@
       -webkit-tap-highlight-color: transparent;
     }
     .rate-skip:active { transform: scale(0.96); }
+
+    /* ====== Ошибка загрузки фильма (404 embess / троттлинг) ====== */
+    .player-error {
+      position:absolute; inset:0; background:#08080d; display:none;
+      align-items:center; justify-content:center; z-index:25; color:#fff;
+    }
+    .player-error.visible { display:flex; }
+    .pe-card {
+      text-align:center; max-width:340px; width:calc(100% - 40px);
+      background:linear-gradient(135deg, rgba(139,92,246,.18), rgba(236,72,153,.08)), rgba(16,16,25,.94);
+      border:1px solid rgba(255,255,255,.12); border-radius:24px; padding:30px 24px;
+      box-shadow:0 20px 60px rgba(0,0,0,.5);
+    }
+    .pe-emoji { font-size:44px; margin-bottom:10px; }
+    .pe-title { font-size:19px; font-weight:800; margin-bottom:8px; letter-spacing:-.02em; }
+    .pe-sub { font-size:13px; color:rgba(255,255,255,.6); line-height:1.5; margin-bottom:20px; }
+    .pe-btns { display:flex; gap:8px; justify-content:center; flex-wrap:wrap; }
+    .pe-btn {
+      background:rgba(255,255,255,.09); border:1px solid rgba(255,255,255,.14); color:#fff;
+      padding:10px 16px; border-radius:13px; font-size:14px; font-weight:700; cursor:pointer;
+      font-family:inherit; transition:transform .15s;
+    }
+    .pe-btn:active { transform:scale(.96); }
+    .pe-primary { background:linear-gradient(135deg,#8b5cf6,#ec4899); border:none; }
+
+    /* ====== Панель скачивания (TorAPI) ====== */
+    .dl-overlay {
+      position:absolute; inset:0; background:rgba(0,0,0,.75);
+      backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
+      display:none; align-items:flex-end; justify-content:center; z-index:40;
+    }
+    .dl-overlay.visible { display:flex; }
+    .dl-panel {
+      background:#101018; border:1px solid rgba(255,255,255,.12); border-bottom:none;
+      border-radius:24px 24px 0 0; width:100%; max-width:640px; max-height:88%;
+      display:flex; flex-direction:column; color:#fff; padding:16px 16px 12px;
+      box-sizing:border-box; animation:dlUp .25s ease-out;
+    }
+    @keyframes dlUp { from { transform:translateY(40px); opacity:0; } to { transform:none; opacity:1; } }
+    .dl-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:4px; }
+    .dl-title { font-size:18px; font-weight:800; letter-spacing:-.02em; }
+    .dl-x { background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.12); color:#fff; width:32px; height:32px; border-radius:10px; cursor:pointer; font-size:14px; }
+    .dl-sub { font-size:13px; color:rgba(255,255,255,.55); margin-bottom:10px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .dl-status { font-size:13px; font-weight:700; color:#a78bfa; margin-bottom:10px; }
+    .dl-results { overflow-y:auto; flex:1; }
+    .dl-group-title { font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:.08em; color:rgba(255,255,255,.45); margin:12px 0 6px; }
+    .dl-item {
+      background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.08);
+      border-radius:14px; padding:10px 12px; margin-bottom:6px; cursor:pointer;
+      transition:background .15s;
+    }
+    .dl-item:active { background:rgba(139,92,246,.18); }
+    .dl-name { font-size:14px; font-weight:600; line-height:1.35; }
+    .dl-meta { font-size:12px; color:rgba(255,255,255,.5); margin-top:3px; }
+    .dl-details { margin-top:8px; font-size:13px; }
+    .dl-magrow { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    .dl-magbtn {
+      background:linear-gradient(135deg,#8b5cf6,#ec4899); color:#fff; text-decoration:none;
+      padding:9px 14px; border-radius:11px; font-size:13px; font-weight:800; display:inline-block;
+    }
+    .dl-copy {
+      background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.12); color:#fff;
+      padding:9px 12px; border-radius:11px; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit;
+    }
+    .dl-q { font-size:12px; color:rgba(255,255,255,.5); margin-top:6px; }
+    .dl-note { font-size:11px; color:rgba(255,255,255,.35); margin-top:10px; line-height:1.4; }
   </style>
 </head>
 <body>
@@ -347,6 +414,7 @@
     <span class="title" id="videoTitle">Загрузка...</span>
     <div class="btn-group">
       <button class="btn btn-fav" id="favBtn" title="В избранное">❤</button>
+      <button class="btn btn-dl" id="dlBtn" title="Скачать">⬇</button>
       <button class="btn btn-close" id="closeBtn" title="Закрыть">✕</button>
     </div>
   </div>
@@ -374,6 +442,32 @@
           <button class="rate-star" data-rating="5">☆</button>
         </div>
         <button class="rate-skip" id="rateSkip"></button>
+      </div>
+    </div>
+    <!-- Ошибка загрузки фильма (нет в источнике / троттлинг embess) -->
+    <div class="player-error" id="playerError">
+      <div class="pe-card">
+        <div class="pe-emoji">🎬</div>
+        <div class="pe-title" id="peTitle">Фильм недоступен в плеере</div>
+        <div class="pe-sub" id="peSub">Источник не вернул видео. Попробуйте скачать через торрент или откройте другой фильм.</div>
+        <div class="pe-btns">
+          <button class="pe-btn pe-primary" id="peDownload">⬇ Скачать</button>
+          <button class="pe-btn" id="peRetry">⟳ Ещё раз</button>
+          <button class="pe-btn" id="peClose">✕ Закрыть</button>
+        </div>
+      </div>
+    </div>
+    <!-- Панель скачивания (TorAPI) -->
+    <div class="dl-overlay" id="dlOverlay">
+      <div class="dl-panel">
+        <div class="dl-head">
+          <span class="dl-title">⬇ Скачать</span>
+          <button class="dl-x" id="dlClose">✕</button>
+        </div>
+        <div class="dl-sub" id="dlSub"></div>
+        <div class="dl-status" id="dlStatus">Ищем раздачи…</div>
+        <div class="dl-results" id="dlResults"></div>
+        <div class="dl-note">Поиск через TorAPI: Кинозал, RuTracker, RuTor, NoNameClub. «Открыть magnet» — в торрент-клиенте (qBittorrent и др.).</div>
       </div>
     </div>
   </div>
@@ -493,12 +587,8 @@
       var body = { type: type, initData: getTgInitData(), userId: getUserId() };
       Object.keys(payload).forEach(function(k) { body[k] = payload[k]; });
       try {
-        fetch('/api/track', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify(body)
-        }).catch(function() {});
+        var tOpts = { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify(body) };
+        (window.FilmotivAPIOrigin ? window.FilmotivAPIOrigin.apiFetch('/api/track', tOpts) : fetch('/api/track', tOpts)).catch(function() {});
       } catch (e) {}
     }
     trackEvent('page_views', { path: '/player' });
@@ -522,13 +612,8 @@
         duration: Math.floor(duration || 0)
       });
       try {
-        fetch('/api/track', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: payload,
-          keepalive: true
-        }).catch(function() {});
+        var pOpts = { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: payload, keepalive: true };
+        (window.FilmotivAPIOrigin ? window.FilmotivAPIOrigin.apiFetch('/api/track', pOpts, 5000) : fetch('/api/track', pOpts)).catch(function() {});
       } catch (e) {}
     }
 
@@ -634,13 +719,18 @@
     // его в localStorage и работаем как авторизованный пользователь.
     async function resolveSessionUser() {
       try {
-        var res = await fetch('/api/me', {
+        var res = await (window.FilmotivAPIOrigin ? window.FilmotivAPIOrigin.apiFetch('/api/me', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
           body: JSON.stringify({ userId: getUserId(), initData: getTgInitData() })
-        });
-        if (!res.ok) return null;
+        }) : fetch('/api/me', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ userId: getUserId(), initData: getTgInitData() })
+        }));
+        if (!res || !res.ok) return null;
         var data = await res.json();
         if (data && data.exists && data.user_id && String(data.user_id).indexOf('web_') !== 0) {
           try {
@@ -661,13 +751,18 @@
       }
       if (!uid || String(uid).indexOf('web_') === 0) return;
       try {
-        var res = await fetch('/api/me', {
+        var res = await (window.FilmotivAPIOrigin ? window.FilmotivAPIOrigin.apiFetch('/api/me', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
           body: JSON.stringify({ userId: uid, initData: getTgInitData() })
-        });
-        if (!res.ok) return;
+        }) : fetch('/api/me', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ userId: uid, initData: getTgInitData() })
+        }));
+        if (!res || !res.ok) return;
         var data = await res.json();
         var favs = data.favorites || [];
         isFavorite = favs.some(function(f) { return String(f.filmId) === String(kid); });
@@ -696,7 +791,7 @@
       }
       var newType = isFavorite ? 'favorite_removed' : 'favorite_added';
       try {
-        await fetch('/api/track', {
+        await (window.FilmotivAPIOrigin ? window.FilmotivAPIOrigin.apiFetch('/api/track', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
@@ -705,7 +800,16 @@
             username: localStorage.getItem('filmotiv_tg_username') || '',
             filmId: kid, title: title
           }), keepalive: true
-        });
+        }) : fetch('/api/track', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            type: newType, initData: getTgInitData(), userId: uid,
+            username: localStorage.getItem('filmotiv_tg_username') || '',
+            filmId: kid, title: title
+          }), keepalive: true
+        }));
         isFavorite = !isFavorite;
         updateFavBtn();
         if (isFavorite) {
@@ -866,9 +970,12 @@
     //
     // ПРЕМИУМ (v176): реклама возвращена обычным пользователям, у премиума —
     // без рекламы. Бридж грузится с &premium=1 только для премиума.
-    //   быстрый путь: localStorage-флаг filmotiv_is_premium (ставится сайтом) —
-    //   грузим сразу с премиум-флагом, ничего не ждём;
-    //   иначе уточняем через /api/me с таймаутом 1с (fail → реклама, как у всех).
+    //
+    // РЕТРАИ (v181 — причина «плеер перестал работать»): embess ОТВЕЧАЕТ 422
+    // (пустое тело) на «горячий» IP — троттлинг, один и тот же фильм
+    // мигрирует 200 <-> 422 между запросами. Раньше делали ОДНУ попытку →
+    // почти всегда 422 → пусто. Теперь до 7 попыток с бэкоффом
+    // (0.4+0.9+1.8+3.2+5+7.5 сек), 404 = фильма правда нет (без ретраев).
     var loadStartTime = performance.now();
     var __playStarted = false;   // видео уже началось — не перезагружаем iframe
     var __bridgePremium = false; // какой бридж сейчас в iframe
@@ -882,18 +989,115 @@
     function premiumCached() {
       try { return localStorage.getItem('filmotiv_is_premium') === '1'; } catch (_) { return false; }
     }
+    var EMBESS_RETRY_DELAYS = [400, 900, 1800, 3200, 5000, 7500];
+    function fetchEmbessHtml(url) {
+      var attempt = 0;
+      function tryOnce() {
+        var ctrl = new AbortController();
+        var timer = setTimeout(function() { try { ctrl.abort(); } catch (_) {} }, 8000);
+        return fetch(url, { headers: { 'Accept': 'text/html,application/xhtml+xml' }, signal: ctrl.signal })
+          .then(function(res) { clearTimeout(timer); return res; })
+          .catch(function(e) { clearTimeout(timer); throw e; });
+      }
+      function loop() {
+        return tryOnce().then(function(res) {
+          if (res.ok) return res.text();
+          if (res.status === 404) {
+            var missing = new Error('FILM_MISSING');
+            missing.missing = true;
+            throw missing;
+          }
+          if (attempt >= EMBESS_RETRY_DELAYS.length) {
+            var throttled = new Error('HTTP ' + res.status);
+            throttled.throttled = true;
+            throw throttled;
+          }
+          var d = EMBESS_RETRY_DELAYS[attempt++];
+          console.log('[player] embess HTTP', res.status, '— retry', attempt, 'in', d, 'ms');
+          return new Promise(function(r) { setTimeout(r, d); }).then(loop);
+        }).catch(function(e) {
+          if (e && (e.missing || e.throttled)) throw e;
+          if (attempt >= EMBESS_RETRY_DELAYS.length) throw e;
+          var d = EMBESS_RETRY_DELAYS[attempt++];
+          console.log('[player] embess network error — retry', attempt, 'in', d, 'ms');
+          return new Promise(function(r) { setTimeout(r, d); }).then(loop);
+        });
+      }
+      return loop();
+    }
+    function buildPlayerHtml(html) {
+      var bridgeTag = '<script src="https://' + window.location.host + '/bridge.js?v=181' + (__bridgePremium ? '&premium=1' : '') + '"><\/script>';
+      var baseTag = '<base href="https://api.embess.ws/">';
+      var referrerMeta = '<meta name="referrer" content="no-referrer">';
+      if (/<head[^>]*>/i.test(html)) {
+        html = html.replace(/<head[^>]*>/i, function(match) {
+          return match + bridgeTag + referrerMeta + baseTag;
+        });
+      } else if (/<html[^>]*>/i.test(html)) {
+        html = html.replace(/(<html[^>]*>)/i, '$1<head>' + bridgeTag + referrerMeta + baseTag + '</head>');
+      } else {
+        html = '<head>' + bridgeTag + referrerMeta + baseTag + '</head>' + html;
+      }
+      return html;
+    }
+    function loadPlayer(premium) {
+      __bridgePremium = !!premium;
+      var upstreamUrl = 'https://api.embess.ws/embed/kp/' + encodeURIComponent(kid);
+      console.log('[player] Fetching', upstreamUrl);
+      hidePlayerError();
+      loadingOverlay.classList.remove('hidden');
+      fetchEmbessHtml(upstreamUrl)
+      .then(function(html) {
+        console.log('[player] Got HTML, size:', html.length, 'in', ((performance.now() - loadStartTime) / 1000).toFixed(2) + 's');
+        iframe.removeAttribute('src');
+        iframe.srcdoc = buildPlayerHtml(html);
+        console.log('[player] srcdoc set, bridge injected');
+      })
+      .catch(function(e) {
+        if (e && e.missing) {
+          console.warn('[player] Фильм отсутствует в embess (404) → экран ошибки');
+          showPlayerError('missing');
+          return;
+        }
+        console.error('[player] Browser fetch failed after retries:', e && e.message);
+        // Финальный fallback: прямой iframe (троттлинг мог отпустить)
+        iframe.srcdoc = '';
+        iframe.src = upstreamUrl;
+        loadingOverlay.classList.add('hidden');
+        showToast('Источник перегружен — пробуем ещё раз…', 3000);
+        // Поздний ретрай: если видео не началось и fetch прошёл — подменяем
+        // на srcdoc-версию с бриджем (resume/премиум работают).
+        setTimeout(function() {
+          if (__playStarted) return;
+          fetchEmbessHtml(upstreamUrl).then(function(html) {
+            if (__playStarted) return;
+            console.log('[player] Late retry OK → srcdoc');
+            iframe.removeAttribute('src');
+            iframe.srcdoc = buildPlayerHtml(html);
+          }).catch(function() {
+            if (!__playStarted) showPlayerError('throttled');
+          });
+        }, 7000);
+      });
+    }
     function fetchPremium() {
       return new Promise(function(resolve) {
         var settled = false;
         function finish(v) { if (!settled) { settled = true; resolve(v); } }
         var timer = setTimeout(function() { finish(false); }, 1000);
         try {
-          fetch('/api/me', {
+          var prReq = (window.FilmotivAPIOrigin ? window.FilmotivAPIOrigin.apiFetch('/api/me', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
             body: JSON.stringify({ userId: getUserId(), initData: getTgInitData() })
-          }).then(function(r) { return r.ok ? r.json() : null; }).then(function(d) {
+          }, 1500) : fetch('/api/me', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ userId: getUserId(), initData: getTgInitData() })
+          }));
+          prReq.then(function(r) { return (r && r.ok) ? r.json() : null; }).then(function(d) {
             clearTimeout(timer);
             var isPrem = !!(d && d.is_premium);
             try { if (isPrem) localStorage.setItem('filmotiv_is_premium', '1'); } catch (_) {}
@@ -1087,14 +1291,9 @@
         rating: rating
       });
       try {
-        fetch('/api/track', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: payload,
-          keepalive: true
-        }).then(function(res) {
-          console.log('[rate] Saved rating', rating, 'for film', kid, '— HTTP', res.status);
+        var rOpts = { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: payload, keepalive: true };
+        (window.FilmotivAPIOrigin ? window.FilmotivAPIOrigin.apiFetch('/api/track', rOpts, 5000) : fetch('/api/track', rOpts)).then(function(res) {
+          if (res) console.log('[rate] Saved rating', rating, 'for film', kid, '— HTTP', res.status);
         }).catch(function(e) {
           console.warn('[rate] Save failed:', e);
         });
@@ -1116,6 +1315,227 @@
 
     // Resume happens silently — no toast. Position is shown on the main page
     // in the "Continue watching" card instead.
+
+    // ====== Экран ошибки плеера (фильма нет / источник перегружен) ======
+    function showPlayerError(kind) {
+      var el = document.getElementById('playerError');
+      if (!el) return;
+      loadingOverlay.classList.add('hidden');
+      var t = document.getElementById('peTitle');
+      var s = document.getElementById('peSub');
+      if (kind === 'missing') {
+        if (t) t.textContent = 'Фильма нет в онлайн-плеере';
+        if (s) s.textContent = 'Источник пока не добавил этот фильм. Скачайте через торрент или откройте другой фильм.';
+      } else {
+        if (t) t.textContent = 'Плеер недоступен';
+        if (s) s.textContent = 'Источник перегружен или заблокирован. Попробуйте ещё раз или скачайте фильм.';
+      }
+      el.classList.add('visible');
+    }
+    function hidePlayerError() {
+      var el = document.getElementById('playerError');
+      if (el) el.classList.remove('visible');
+    }
+    var peRetry = document.getElementById('peRetry');
+    if (peRetry) peRetry.addEventListener('click', function() { hidePlayerError(); loadingOverlay.classList.remove('hidden'); loadPlayer(__bridgePremium); });
+    var peDl = document.getElementById('peDownload');
+    if (peDl) peDl.addEventListener('click', function() { hidePlayerError(); openDownloads(); });
+    var peClose = document.getElementById('peClose');
+    if (peClose) peClose.addEventListener('click', function() { window.location.href = '/'; });
+
+    // ====== Скачать (TorAPI: Кинозал, RuTracker, RuTor, NoNameClub) ======
+    // Пользовательский TorAPI-инстанс (клон Lifailon/TorAPI):
+    //   GET /api/search/title/all?query=...&year=...&page=0
+    //     → { RuTracker:[{Name,Id,Size,Seeds,Date,...}], Kinozal:[...], ... }
+    //   GET /api/search/id/{provider}?id=...
+    //     → [{ Name, Magnet, Hash, Torrent, Size, Quality, Audio, ... }]
+    // CORS у TorAPI открыт (Access-Control-Allow-Origin: *).
+    var filmYear = ''; // подтягивается из Кинопоиска при первом открытии панели
+    var yearFetched = false;
+    var TOR_BASES_KEY = 'filmotiv_torapi_bases';
+    function torBases() {
+      var def = ['https://kinozal-proxy-seven.vercel.app', 'https://torapi.vercel.app'];
+      try {
+        var extra = JSON.parse(localStorage.getItem(TOR_BASES_KEY) || 'null');
+        if (Array.isArray(extra)) {
+          var clean = [];
+          for (var i = 0; i < extra.length; i++) {
+            if (typeof extra[i] === 'string' && extra[i].indexOf('http') === 0 && clean.indexOf(extra[i]) === -1) clean.push(extra[i]);
+          }
+          for (var j = 0; j < def.length; j++) if (clean.indexOf(def[j]) === -1) clean.push(def[j]);
+          return clean;
+        }
+      } catch (_) {}
+      return def;
+    }
+    var torBase = null;
+    async function torProbe() {
+      if (torBase) return torBase;
+      var bases = torBases();
+      for (var i = 0; i < bases.length; i++) {
+        try {
+          var ctrl = new AbortController();
+          var t = setTimeout(function() { try { ctrl.abort(); } catch (_) {} }, 6000);
+          var r = await fetch(bases[i] + '/api/provider/list', { signal: ctrl.signal });
+          clearTimeout(t);
+          if (r.ok) { torBase = bases[i]; console.log('[dl] TorAPI:', torBase); return torBase; }
+        } catch (_) {}
+      }
+      return null;
+    }
+    async function ensureFilmYear() {
+      if (yearFetched) return filmYear;
+      yearFetched = true;
+      try {
+        var apiOrigin = window.FilmotivAPIOrigin && !window.FilmotivAPIOrigin.isVercelHost()
+          ? window.FilmotivAPIOrigin.VERCEL : '';
+        var r = await fetch(apiOrigin + '/api/kinopoisk?q=v2.2/films/' + encodeURIComponent(kid));
+        if (r.ok) {
+          var d = await r.json();
+          if (d && d.year) filmYear = String(d.year).match(/^\d{4}/) ? String(d.year).slice(0, 4) : '';
+        }
+      } catch (_) {}
+      return filmYear;
+    }
+    var TOR_GROUPS = [
+      { key: 'Kinozal', slug: 'kinozal', label: 'Кинозал' },
+      { key: 'RuTracker', slug: 'rutracker', label: 'RuTracker' },
+      { key: 'RuTor', slug: 'rutor', label: 'RuTor' },
+      { key: 'NoNameClub', slug: 'nonameclub', label: 'NoNameClub' }
+    ];
+    function dlStatus(msg) {
+      var el = document.getElementById('dlStatus');
+      if (el) el.textContent = msg;
+    }
+    async function openDownloads() {
+      var ov = document.getElementById('dlOverlay');
+      if (!ov) return;
+      ov.classList.add('visible');
+      var sub = document.getElementById('dlSub');
+      if (sub) sub.textContent = title;
+      var results = document.getElementById('dlResults');
+      if (results) results.innerHTML = '';
+      dlStatus('Ищем TorAPI-сервер…');
+      var base = await torProbe();
+      if (!base) {
+        dlStatus('TorAPI недоступен (' + torBases()[0] + ' не отвечает). Попробуйте позже, включите VPN или добавьте свой адрес в localStorage.filmotiv_torapi_bases.');
+        return;
+      }
+      dlStatus('Ищем раздачи…');
+      var yr = await ensureFilmYear();
+      try {
+        var q = base + '/api/search/title/all?query=' + encodeURIComponent(title) +
+                (yr ? '&year=' + encodeURIComponent(yr) : '') + '&page=0';
+        var r = await fetch(q);
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        var data = await r.json();
+        var total = 0;
+        if (results) {
+          TOR_GROUPS.forEach(function(g) {
+            var arr = (data && data[g.key]) || [];
+            if (!Array.isArray(arr) || arr.length === 0) return;
+            total += arr.length;
+            results.appendChild(renderGroup(g, arr));
+          });
+        }
+        dlStatus(total > 0
+          ? 'Найдено раздач: ' + total + (yr ? ' · год ' + yr : '')
+          : 'Ничего не найдено по запросу «' + title + '»');
+      } catch (e) {
+        dlStatus('Ошибка поиска: ' + (e && e.message ? e.message : 'сеть') + ' — сервер ' + base);
+      }
+    }
+    function renderGroup(g, arr) {
+      var wrap = document.createElement('div');
+      wrap.className = 'dl-group';
+      var h = document.createElement('div');
+      h.className = 'dl-group-title';
+      h.textContent = g.label + ' (' + arr.length + ')';
+      wrap.appendChild(h);
+      arr.slice(0, 12).forEach(function(item) {
+        var row = document.createElement('div');
+        row.className = 'dl-item';
+        var nm = document.createElement('div');
+        nm.className = 'dl-name';
+        nm.textContent = item.Name || item.name || 'Раздача';
+        var meta = document.createElement('div');
+        meta.className = 'dl-meta';
+        meta.textContent = [item.Size, item.Seeds ? 'сидов: ' + item.Seeds : '', item.Date || ''].filter(Boolean).join(' · ');
+        row.appendChild(nm);
+        row.appendChild(meta);
+        var expand = document.createElement('div');
+        expand.className = 'dl-details';
+        expand.style.display = 'none';
+        row.appendChild(expand);
+        var opened = false;
+        row.addEventListener('click', async function() {
+          if (expand.style.display === 'block') { expand.style.display = 'none'; return; }
+          if (opened) { expand.style.display = 'block'; return; }
+          opened = true;
+          expand.style.display = 'block';
+          expand.textContent = 'Загрузка магнита…';
+          try {
+            var r = await fetch(torBase + '/api/search/id/' + g.slug + '?id=' + encodeURIComponent(item.Id));
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            var d = await r.json();
+            var it = Array.isArray(d) ? d[0] : d;
+            expand.innerHTML = '';
+            if (!it || (!it.Magnet && !it.Torrent)) {
+              expand.textContent = 'Магнит недоступен для этой раздачи';
+              return;
+            }
+            var magRow = document.createElement('div');
+            magRow.className = 'dl-magrow';
+            var a = document.createElement('a');
+            a.className = 'dl-magbtn';
+            if (it.Magnet) { a.href = it.Magnet; a.textContent = '🧲 Открыть magnet'; }
+            else if (it.Torrent) { a.href = it.Torrent; a.textContent = '⬇ Скачать .torrent'; }
+            a.target = '_blank';
+            a.rel = 'noopener';
+            magRow.appendChild(a);
+            if (it.Magnet) {
+              var cp = document.createElement('button');
+              cp.className = 'dl-copy';
+              cp.textContent = 'Копировать';
+              cp.addEventListener('click', function(e) {
+                e.stopPropagation();
+                try {
+                  navigator.clipboard.writeText(it.Magnet);
+                  cp.textContent = '✓ Скопировано';
+                  setTimeout(function() { cp.textContent = 'Копировать'; }, 1500);
+                } catch (_) {}
+              });
+              magRow.appendChild(cp);
+            }
+            expand.appendChild(magRow);
+            var extra = [it.Quality, it.Audio].filter(Boolean).join(' · ');
+            if (extra) {
+              var q = document.createElement('div');
+              q.className = 'dl-q';
+              q.textContent = extra;
+              expand.appendChild(q);
+            }
+          } catch (e) {
+            expand.textContent = 'Ошибка: ' + (e && e.message ? e.message : 'сеть');
+          }
+        });
+        wrap.appendChild(row);
+      });
+      return wrap;
+    }
+    function closeDownloads() {
+      var ov = document.getElementById('dlOverlay');
+      if (ov) ov.classList.remove('visible');
+    }
+    var dlBtn = document.getElementById('dlBtn');
+    if (dlBtn) dlBtn.addEventListener('click', openDownloads);
+    var dlCloseBtn = document.getElementById('dlClose');
+    if (dlCloseBtn) dlCloseBtn.addEventListener('click', closeDownloads);
+    var dlOv = document.getElementById('dlOverlay');
+    if (dlOv) dlOv.addEventListener('click', function(e) { if (e.target === dlOv) closeDownloads(); });
+    // Кнопка «Скачать» в шапке — чуть приглушённый стиль уже есть (.btn);
+    // подсветим градиентом как премиальную:
+    if (dlBtn) dlBtn.style.background = 'rgba(139,92,246,0.18)';
   </script>
 </body>
 </html>

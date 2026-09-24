@@ -353,7 +353,7 @@
       var initData = getTgInitData();
       var uid = localStorage.getItem('filmotiv_tg_user_id') || '';
       if (!initData && !uid) return; // гость — только localStorage, мигрирует при логине
-      fetch('/api/track', {
+      apiSend('/api/track', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -372,6 +372,12 @@
       return (t && t.initData) ? t.initData : '';
     } catch (_) { return ''; }
   }
+  // fetch с ротацией происхождения (зеркало -> vercel). На genocide12.github.io
+  // голый fetch('/api/...') попадает на GitHub Pages -> 405 Method Not Allowed.
+  function apiSend(path, opts) {
+    if (window.FilmotivAPIOrigin) return window.FilmotivAPIOrigin.apiFetch(path, opts);
+    return fetch(path, opts);
+  }
 
   // ====== SERVER FAVORITES SYNC ======
   // Кнопки «В коллекцию» должны отражать серверную коллекцию даже на свежей
@@ -383,12 +389,12 @@
       var initData = getTgInitData();
       var uid = localStorage.getItem('filmotiv_tg_user_id') || '';
       if (!initData && !uid) return; // гость — серверной коллекции нет
-      fetch('/api/me', {
+      apiSend('/api/me', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({ userId: uid || undefined, initData: initData || undefined })
-      }).then(function(r) { return r.ok ? r.json() : null; }).then(function(data) {
+      }).then(function(r) { return (r && r.ok) ? r.json() : null; }).then(function(data) {
         if (!data) return;
         if (Array.isArray(data.favorites)) {
           var server = data.favorites.map(function(f) {
