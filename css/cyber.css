@@ -394,6 +394,43 @@ body.gp-open .gp-backdrop { opacity: 1; pointer-events: auto; }
   background: #070b1e;
   box-shadow: 0 18px 50px rgba(2, 4, 14, .55);
 }
+/* Надпись «Смотрят онлайн» — внутри блока cyber-hero (верхний левый угол) */
+.cyber-hero-head {
+  position: absolute;
+  top: 18px;
+  left: 22px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 15px;
+  border-radius: 999px;
+  background: rgba(5, 8, 22, .74);
+  border: 1px solid rgba(126, 140, 255, .28);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: #e8ebff;
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: .03em;
+  box-shadow: 0 4px 18px rgba(2, 4, 14, .5);
+}
+.cyber-hero-live {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #3ddc84;
+  box-shadow: 0 0 0 0 rgba(61, 220, 132, .55);
+  animation: gp-live-pulse 1.8s ease-out infinite;
+}
+@keyframes gp-live-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(61, 220, 132, .55); }
+  70% { box-shadow: 0 0 0 9px rgba(61, 220, 132, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(61, 220, 132, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cyber-hero-live { animation: none; }
+}
 .cyber-hero-slide {
   position: absolute;
   inset: 0;
@@ -1210,6 +1247,7 @@ body.view-search .pm-search .search-container {
   .cyber-hero { min-height: 300px; border-radius: 16px; }
   .cyber-hero-content { padding: 20px 20px 24px; max-width: none; }
   .cyber-hero-count { display: none; }
+  .cyber-hero-head { top: 12px; left: 12px; padding: 6px 12px; font-size: 12.5px; gap: 7px; }
   .cyber-hero-dots { flex-direction: row; top: 14px; right: 14px; }
   .cyber-row { grid-auto-columns: 132px; gap: 11px; }
   .cyber-chips { grid-template-columns: repeat(2, minmax(0, 1fr)); }

@@ -206,7 +206,9 @@
     if (!hero || !films || films.length === 0) return;
     heroFilms = films.filter(function(f) { return posterOf(f); }).slice(0, 5);
     if (heroFilms.length === 0) return;
-    var html = '';
+    // Надпись «Смотрят онлайн» — ВНУТРИ блока cyber-hero (запрос пользователя),
+    // с пульсирующим live-индикатором: фильмы — топ-100 Кинопоиска.
+    var html = '<div class="cyber-hero-head"><span class="cyber-hero-live" aria-hidden="true"></span>Смотрят онлайн</div>';
     for (var i = 0; i < heroFilms.length; i++) {
       var f = heroFilms[i];
       var fid = filmIdOf(f);
@@ -511,42 +513,9 @@
   }
 
   function initSections() {
-    var popCached = readCatCache('popular');
-    if (popCached) renderRow('cyberRowPopular', popCached);
-    // «Новинки» из localStorage НЕ берём: четверговый список должен быть
-    // свежим — ensureNew() всегда идёт через /api/new-films
-
-    function ensurePopular() {
-      if ($('cyberRowPopular') && $('cyberRowPopular').children.length === 0) {
-        fetchCat('popular').then(function(data) {
-          var films = (data && (data.films || data.items)) || [];
-          if (films.length > 0) {
-            App.MOVIES.filterAvailable(films).then(function(avail) {
-              if ($('cyberRowPopular').children.length > 0 || avail.length === 0) return;
-              renderRow('cyberRowPopular', avail);
-              try { if (App.TRACKING && App.TRACKING.cacheFilms) App.TRACKING.cacheFilms('popular', 1, { films: avail }); } catch (_) {}
-            });
-          }
-        });
-      }
-    }
-    function ensureNew() {
-      if ($('cyberRowNew') && $('cyberRowNew').children.length === 0) {
-        fetchCat('new').then(function(data) {
-          var films = (data && (data.films || data.items)) || [];
-          if (films.length > 0) {
-            App.MOVIES.filterAvailable(films).then(function(avail) {
-              if ($('cyberRowNew').children.length > 0 || avail.length === 0) return;
-              renderRow('cyberRowNew', avail, { isNew: true });
-            });
-          }
-        });
-      }
-    }
-    // Прогрев app.js кладёт кеш на 0с (popular) и 3с (new) — подождём,
-    // затем добираем сами, если пусто.
-    setTimeout(function() { ensurePopular(); ensureNew(); ensureTop(); }, 3600);
-    if (!popCached) setTimeout(ensurePopular, 1200);
+    // Секции «Смотрят онлайн» (ряд) и «★ Новинки 2026» удалены по запросу:
+    // популярные теперь показаны самим cyber-hero (с надписью внутри блока),
+    // новинки остались категорией в сайдбаре/чипах.
     setTimeout(ensureTop, 1500);
 
     var secs = $('cyberSections');
@@ -760,13 +729,23 @@
     try { renderRecent(); } catch (_) {} // «Последние фильмы» в рейле
     try { refreshFavButtons(); syncServerFavs(); } catch (_) {} // SYNC FIX: серверная коллекция в кнопки
     try { initSections(); } catch (_) {}
-    // hero: из кеша сразу, иначе догружаем
+    // hero: из кеша сразу, иначе догружаем. Фильмы героя тоже чистим
+    // проверкой «есть в плеере» (fail-open: если проверка не удалась —
+    // показываем список как есть, пустой баннер хуже).
     try {
+      var heroFill = function(films) {
+        App.MOVIES.filterAvailable(films).then(function(avail) {
+          var hero = $('cyberHero');
+          if (!hero || hero.children.length > 0) return; // уже собран
+          if (avail.length > 0) heroBuild(avail);
+          else heroBuild(films);
+        });
+      };
       var pop = readCatCache('popular');
-      if (pop) heroBuild(pop);
+      if (pop) heroFill(pop);
       else fetchCat('popular').then(function(data) {
         var films = (data && (data.films || data.items)) || [];
-        if (films.length > 0) heroBuild(films);
+        if (films.length > 0) heroFill(films);
       });
     } catch (_) {}
     try {

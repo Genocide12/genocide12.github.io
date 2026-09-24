@@ -44,7 +44,7 @@
   <link rel="dns-prefetch" href="https://filmotiv.vercel.app">
   <link rel="canonical" href="https://filmotiv.vercel.app/">
   <script defer src="/i18n.js"></script>
-  <script defer src="/js/error-handler.js?v=178"></script>
+  <script defer src="/js/error-handler.js?v=179"></script>
   <script>
     // ALWAYS attempt to load telegram-web-app.js — but only AFTER the window
     // load event. Two reasons:
@@ -97,8 +97,8 @@
       else window.addEventListener('load', insertTgScript, { once: true });
     })();
   </script>
-  <link rel="stylesheet" href="/css/app.css?v=178">
-  <link rel="stylesheet" href="/css/cyber.css?v=178">
+  <link rel="stylesheet" href="/css/app.css?v=179">
+  <link rel="stylesheet" href="/css/cyber.css?v=179">
   <!-- Structured Data for Search Engines (JSON-LD) -->
   <script type="application/ld+json">
   {
@@ -241,25 +241,12 @@
           </button>
         </div>
 
-        <!-- КИБЕР-БАННЕР: карусель популярных фильмов (заполняет cyber.js) -->
-        <div class="cyber-hero" id="cyberHero" hidden aria-label="Подборка фильмов"></div>
+        <!-- КИБЕР-БАННЕР «Смотрят онлайн»: надпись и фильмы — внутри блока
+             cyber-hero (карусель топ-100 Кинопоиска, заполняет cyber.js) -->
+        <div class="cyber-hero" id="cyberHero" hidden aria-label="Смотрят онлайн"></div>
 
         <!-- СЕКЦИИ ГЛАВНОЙ (заполняет cyber.js) -->
         <div class="cyber-sections" id="cyberSections" hidden>
-          <div class="cyber-section">
-            <div class="cyber-section-head">
-              <div class="cyber-section-title">🔥 Смотрят онлайн</div>
-              <button class="cyber-section-all" data-cat="popular" type="button">Все</button>
-            </div>
-            <div class="cyber-row" id="cyberRowPopular"></div>
-          </div>
-          <div class="cyber-section">
-            <div class="cyber-section-head">
-              <div class="cyber-section-title">★ Новинки 2026</div>
-              <button class="cyber-section-all" data-cat="new" type="button">Все</button>
-            </div>
-            <div class="cyber-row" id="cyberRowNew"></div>
-          </div>
           <div class="cyber-section">
             <div class="cyber-section-head">
               <div class="cyber-section-title">Жанры</div>
@@ -407,10 +394,10 @@
     </div>
   </div>
   <!-- ADHD OS micro-interactions (confetti, toasts, haptics) -->
-  <script defer src="/js/adhd-os.js?v=178"></script>
+  <script defer src="/js/adhd-os.js?v=179"></script>
   <!-- All JS bundled into one file (core + device + auth + ui + movies + tracking + app) -->
-  <script defer src="/js/app.js?v=178"></script>
+  <script defer src="/js/app.js?v=179"></script>
   <!-- Neon dashboard: сайдбар, герой, секции, жанры, рейл, режим поиска -->
-  <script defer src="/js/cyber.js?v=178"></script>
+  <script defer src="/js/cyber.js?v=179"></script>
 </body>
 </html>

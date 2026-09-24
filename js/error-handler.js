@@ -66,4 +66,59 @@
     window.addEventListener('unhandledrejection', function(e) {
       console.error('[unhandled rejection]', e.reason && e.reason.message ? e.reason.message : e.reason);
     });
+
+    // ====== JS-ошибки → Telegram админу (через /api/track type=js_error) ======
+    // Клиентский flood-guard: не более 5 репортов за 10 минут на сессию —
+    // зацикленный ошибкой сайт не должен заспамить админа и /api/track.
+    (function() {
+      var SENT_KEY = 'filmotiv_err_ts';
+      var MAX_PER_WINDOW = 5;
+      var WINDOW_MS = 10 * 60 * 1000;
+      function underLimit() {
+        try {
+          var now = Date.now();
+          var arr = [];
+          try { arr = JSON.parse(localStorage.getItem(SENT_KEY) || '[]'); } catch (_) {}
+          arr = arr.filter(function(ts) { return typeof ts === 'number' && now - ts < WINDOW_MS; });
+          if (arr.length >= MAX_PER_WINDOW) return false;
+          arr.push(now);
+          localStorage.setItem(SENT_KEY, JSON.stringify(arr));
+          return true;
+        } catch (_) { return false; }
+      }
+      function report(message, source, lineno, colno, stack) {
+        try {
+          if (!message) return;
+          if (!underLimit()) return;
+          var payload = {
+            type: 'js_error',
+            message: String(message).slice(0, 300),
+            source: String(source || '').replace(location.origin, '').slice(0, 160),
+            line: lineno || 0,
+            col: colno || 0,
+            stack: String(stack || '').slice(0, 600),
+            path: location.pathname,
+            url: location.href.slice(0, 200),
+            userId: (function() {
+              try { return localStorage.getItem('filmotiv_tg_user_id') || localStorage.getItem('filmotiv_user_id') || ''; } catch (_) { return ''; }
+            })()
+          };
+          var body = JSON.stringify(payload);
+          if (navigator.sendBeacon) {
+            navigator.sendBeacon('/api/track', new Blob([body], { type: 'application/json' }));
+          } else {
+            fetch('/api/track', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body, keepalive: true }).catch(function() {});
+          }
+        } catch (_) {}
+      }
+      window.addEventListener('error', function(e) {
+        // Ошибки ресурсов (img/script/css) без message слишком шумные — пропускаем
+        if (!e.message && e.target && e.target !== window) return;
+        report(e.message, e.filename, e.lineno, e.colno, e.error && e.error.stack);
+      }, true);
+      window.addEventListener('unhandledrejection', function(e) {
+        var r = e.reason;
+        report(r && r.message ? r.message : (r ? String(r) : ''), 'unhandledrejection', 0, 0, r && r.stack);
+      });
+    })();
   
