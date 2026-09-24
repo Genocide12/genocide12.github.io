@@ -105,10 +105,13 @@
     function probe() {
       var ctrl = (typeof AbortController === 'function') ? new AbortController() : null;
       var timer = ctrl ? setTimeout(function() { try { ctrl.abort(); } catch (_) {} }, 4000) : null;
-      fetch('/api/health', ctrl ? { signal: ctrl.signal, cache: 'no-store' } : { cache: 'no-store' })
+      // OPTIONS /api/me — самый дешёвый вызов serverless-функции (ответ 200
+      // из первой строки, без Supabase). Лимит Hobby: 12 функций, поэтому
+      // отдельного /api/health нет.
+      fetch('/api/me', ctrl ? { method: 'OPTIONS', signal: ctrl.signal, cache: 'no-store' } : { method: 'OPTIONS', cache: 'no-store' })
         .then(function(r) {
           if (timer) clearTimeout(timer);
-          if (!r.ok) throw new Error('HTTP ' + r.status);
+          if (!r.ok && r.status !== 204) throw new Error('HTTP ' + r.status);
           console.log('[origin] prod healthy');
         })
         .catch(function() {
