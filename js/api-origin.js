@@ -182,6 +182,7 @@
     origins: origins,
     apiFetch: apiFetch,
     beaconUrl: beaconUrl,
+    edgeUrl: edgeUrl,
     watchRedirect: watchRedirect
   };
   watchRedirect();
