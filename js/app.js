@@ -761,25 +761,41 @@
     saveAvailMap: function() {
       try { localStorage.setItem('filmotiv_avail_v1', JSON.stringify({ map: this._availCache, ts: Date.now() })); } catch (_) {}
     },
-    // Прямая проверка embess из браузера. 200 → true, 404 → false,
+    // Прямая проверка доступности из браузера. 200 → true, 404 → false,
     // прочее → null (неизвестно). Тело НЕ читаем (отменяем стрим — экономия).
+    // v183: хостов ШЕСТЬ (семейство embess: embess/atomics/marts/domem/namy,
+    // обнаружено в reyohoho kinoserver.py). 422-троттлинг гуляет между
+    // зеркалами — каждая проверка бьёт в следующий по кругу хост, при
+    // промахе пробует второй. Раньше все проверки били только в embess.
+    _availHosts: [
+      'https://api.embess.ws/embed/kp/',
+      'https://api1690380040.atomics.ws/embed/kp/',
+      'https://api.marts.ws/embed/kp/',
+      'https://api.domem.ws/embed/kp/',
+      'https://api.namy.ws/embed/kp/',
+      'https://api.atomics.ws/embed/kp/'
+    ],
+    _availHostIdx: 0,
     _embessCheck: async function(id) {
-      var ctrl = new AbortController();
-      var timer = setTimeout(function() { try { ctrl.abort(); } catch (_) {} }, 6000);
-      try {
-        var res = await fetch('https://api.embess.ws/embed/kp/' + encodeURIComponent(id), {
+      function one(h) {
+        var ctrl = new AbortController();
+        var timer = setTimeout(function() { try { ctrl.abort(); } catch (_) {} }, 6000);
+        return fetch(h + encodeURIComponent(id), {
           signal: ctrl.signal,
           headers: { 'Accept': 'text/html' }
-        });
-        try { if (res.body && res.body.cancel) res.body.cancel(); } catch (_) {}
-        if (res.status === 404) return false;
-        if (res.ok) return true;
-        return null;
-      } catch (e) {
-        return null;
-      } finally {
-        clearTimeout(timer);
+        }).then(function(res) {
+          try { if (res.body && res.body.cancel) res.body.cancel(); } catch (_) {}
+          clearTimeout(timer);
+          if (res.status === 404) return false;
+          if (res.ok) return true;
+          return null;
+        }).catch(function() { clearTimeout(timer); return null; });
       }
+      var h1 = this._availHosts[this._availHostIdx++ % this._availHosts.length];
+      var r1 = await one(h1);
+      if (r1 !== null) return r1;
+      var h2 = this._availHosts[this._availHostIdx++ % this._availHosts.length];
+      return one(h2);
     },
     // Прямая батч-проверка с ограничением параллельности
     // Сессионная квота проверок embess (v182: 24 — раньше 120 добивали

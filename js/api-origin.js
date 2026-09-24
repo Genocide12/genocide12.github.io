@@ -12,17 +12,33 @@
 //   1) apiFetch(path, opts) — fetch с автоматической ротацией происхождения
 //      для ЛЮБЫХ методов (GET/POST). Рабочее происхождение «залипает»
 //      в localStorage на 1 час.
-//   2) watchRedirect() — на vercel-хостах, если /api/health недоступен
+//   2) watchRedirect() — на vercel-хостах, если /api/me недоступен
 //      дважды подряд, показываем плашку и автоматически переходим на зеркало
 //      genocide12.github.io (запрос пользователя: «автоматическое
 //      перенаправление на github.io с vercel, если последний недоступен»).
+//      Техническое ограничение: если ХОСТ полностью заблокирован (страница
+//      вообще не открылась), JS не выполнится — тут помогает только зеркало.
+//
+// v183 (2026-09-25): ОБНАРУЖЕНО И ИСПРАВЛЕНО:
+//   а) SSO Deployment Protection (ssoProtection: all_except_custom_domains)
+//      закрывала ВСЕ deployment-URL редиректом на vercel.com/login →
+//      BACKUP-origin отдавал HTML логина вместо API (пользователь: «фильмы
+//      для скачивания не находит»). Защита снята через Vercel API.
+//   б) RU-блокировка ВЫБОРОЧНА по hostname/IP (check-host: vercel.app из
+//      ru1/ru2 — timeout, ru3 — 200). Стабильные hostname проекта
+//      filmotiv-genocide12s-projects (последний prod) и
+//      filmotiv-git-main-genocide12s-projects (ветка main) резолвятся в
+//      ДРУГИЕ IP anycast и открываются с ru1, где vercel.app не доступен.
+//      Оба добавлены в цепочку ротации перед per-deployment BACKUP.
 //      Техническое ограничение: если ХОСТ полностью заблокирован (страница
 //      вообще не открылась), JS не выполнится — тут помогает только зеркало.
 (function() {
   'use strict';
 
   var VERCEL = 'https://filmotiv.vercel.app';
-  var BACKUP = 'https://filmotiv-5sp8sjewa-genocide12s-projects.vercel.app';
+  var PROJECT = 'https://filmotiv-genocide12s-projects.vercel.app';      // стабильный: последний prod
+  var BRANCH = 'https://filmotiv-git-main-genocide12s-projects.vercel.app'; // стабильный: ветка main
+  var BACKUP = 'https://filmotiv-5sp8sjewa-genocide12s-projects.vercel.app'; // per-deployment (устаревает)
   var MIRROR = 'https://genocide12.github.io/';
   var LS_KEY = 'filmotiv_api_origin_v2';
   var TTL = 60 * 60 * 1000; // 1 час
@@ -48,7 +64,8 @@
 
   // Список кандидатов. На vercel-хостах '' (same-origin) всегда первый.
   function origins() {
-    var list = isVercelHost() ? ['', VERCEL, BACKUP] : [VERCEL, BACKUP];
+    var list = isVercelHost() ? ['', VERCEL, PROJECT, BRANCH, BACKUP]
+                              : [VERCEL, PROJECT, BRANCH, BACKUP];
     var c = cachedOrigin();
     if (c && c !== '') {
       var i = list.indexOf(c);
@@ -63,7 +80,7 @@
   async function apiFetch(path, opts, timeoutMs) {
     opts = opts || {};
     var list = origins();
-    var maxTries = Math.min(list.length, 3);
+    var maxTries = Math.min(list.length, 5);
     var lastStatus = 0;
     for (var a = 0; a < maxTries; a++) {
       var o = list[a];
@@ -147,6 +164,8 @@
 
   window.FilmotivAPIOrigin = {
     VERCEL: VERCEL,
+    PROJECT: PROJECT,
+    BRANCH: BRANCH,
     BACKUP: BACKUP,
     MIRROR: MIRROR,
     isVercelHost: isVercelHost,
