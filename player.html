@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://api.embess.ws" crossorigin>
   <link rel="dns-prefetch" href="https://api.embess.ws">
   <script src="/i18n.js"></script>
-  <script src="/js/api-origin.js?v=184"></script>
+  <script src="/js/api-origin.js?v=185"></script>
   <!-- Vercel Web Analytics убран из плеера (v184): EasyList/адблоки режут
        cdn.vercel-insights.com/v1/script.js → ERR_BLOCKED_BY_CLIENT в консоли -->
   <title>Плеер</title>
@@ -943,16 +943,16 @@
     // ниже по файлу (function hoisting) — ретраи фактически никогда не
     // работали. Дубль удалён, теперь цепочка здесь.
     //
-    // v184 — ТРИ ФАЗЫ (по логу пользователя: все 6 хостов 422 подряд, а
-    // FlixCDN-обёртка в srcdoc не стартовала видео — её API требует свой
-    // origin, плюс адблок резал её внутренний скрипт):
-    //   ФАЗА 1 — браузерные запросы к 6 зеркалам семейства (быстро, когда
-    //            IP «холодный»; фильтр доступности больше их НЕ греет);
-    //   ФАЗА 2 — серверный _embed-fetch (наш API): с Vercel-IP семейство
-    //            отдаёт 410, поэтому внутри — бесплатный прокси-егресс
-    //            (CONNECT-туннели). Не зависит от IP и адблока пользователя;
-    //   ФАЗА 3 — FlixCDN ПРЯМЫМ iframe (его плеер работает только со своим
-    //            origin; X-Frame-Options нет — проверено). Без бриджа.
+    // ДВЕ фазы (v185). Серверная фаза v184 (_embed-fetch) УДАЛЕНА
+    // из цепочки: живой замер показал 502 за 12с — анти-бот семейства режет
+    // ВСЕ дата-центр IP (410), а Cloudflare-фронты отказывают бесплатным
+    // прокси и релеям (refused/520/522). Семейство берётся ТОЛЬКО из
+    // браузера. Эндпоинт _embed-fetch оставлен как диагностика.
+    //   ФАЗА 1 — браузерные запросы к 6 зеркалам семейства (IP остаётся
+    //            «холодным»: фильтр доступности их больше не греет);
+    //   ФАЗА 2 — FlixCDN ПРЯМЫМ iframe (его API работает только со своим
+    //            origin — поэтому srcdoc-обёртка v184 не воспроизводила
+    //            видео; X-Frame-Options нет — проверено). Без бриджа.
     var PLAYER_PROVIDERS = [
       { label: 'embess',   fetch: 'https://api.embess.ws/embed/kp/',            base: 'https://api.embess.ws/' },
       { label: 'atomics0', fetch: 'https://api1690380040.atomics.ws/embed/kp/', base: 'https://api1690380040.atomics.ws/' },
@@ -987,31 +987,14 @@
       } catch (_) {}
     }
 
-    // Три фазы. onHtml(html, provider) — HTML для srcdoc (семейство или
-    // сервер), onIframe(url) — прямой iframe (FlixCDN), onFail(allMissing).
-    // 404 всего семейства = «точно нет» (каталог общий) — сервер/резерв не
-    // тратим. Иначе после семейства — сервер, потом FlixCDN.
+    // Две фазы. onHtml(html, provider) — HTML для srcdoc (семейство),
+    // onIframe(url) — прямой iframe (FlixCDN), onFail(allMissing).
+    // 404 всего семейства = «точно нет» (каталог общий) — финал без FlixCDN.
     function tryChain(onHtml, onIframe, onFail) {
       var start = __providerStart++ % PLAYER_PROVIDERS.length;
       var missing = 0;
       var i = 0;
       function phase2() {
-        console.log('[player] серверный _embed-fetch…');
-        var url = '/api/kinopoisk?q=_embed-fetch&kp=' + encodeURIComponent(kid);
-        var req = window.FilmotivAPIOrigin
-          ? window.FilmotivAPIOrigin.apiFetch(url, null, 22000)
-          : fetch(url);
-        req.then(function(res) {
-          if (!res || !res.ok) throw new Error('server ' + (res ? res.status : 'null'));
-          return res.json();
-        }).then(function(d) {
-          if (d && d.ok && d.html && d.base) {
-            reportAvailable(true);
-            onHtml(d.html, { label: 'server:' + (d.via || 'direct'), base: d.base });
-          } else throw new Error('no html');
-        }).catch(function() { phase3(); });
-      }
-      function phase3() {
         console.log('[player] FlixCDN → прямой iframe (без бриджа)');
         onIframe(FLIXCDN_URL + encodeURIComponent(kid));
       }
@@ -1034,7 +1017,7 @@
       })();
     }
     function buildPlayerHtml(html, baseHref) {
-      var bridgeTag = '<script src="https://' + window.location.host + '/bridge.js?v=184' + (__bridgePremium ? '&premium=1' : '') + '"><\/script>';
+      var bridgeTag = '<script src="https://' + window.location.host + '/bridge.js?v=185' + (__bridgePremium ? '&premium=1' : '') + '"><\/script>';
       var baseTag = '<base href="' + (baseHref || 'https://api.embess.ws/') + '">';
       var referrerMeta = '<meta name="referrer" content="no-referrer">';
       if (/<head[^>]*>/i.test(html)) {
@@ -1084,7 +1067,7 @@
           showPlayerError('missing');
           return;
         }
-        console.warn('[player] семейство и сервер исчерпаны, flixcdn не подошёл → экран ошибки + фоновые ретраи');
+        console.warn('[player] семейство 422/сеть и FlixCDN не помогли → экран ошибки + фоновые ретраи');
         showPlayerError('throttled');
         startBgRetry();
       });
