@@ -1,12 +1,25 @@
 // Bridge script — injected as the FIRST element in <head> of the iframe.
-// Blocks ad config (prevents "fullscreen disabled during ad" message),
-// blocks tracking endpoints, fixes player controls visibility.
 //
-// ПРЕМИУМ-РЕЖИМ (v176): блокировка рекламы — привилегия премиума.
-//   /bridge.js?v=176&premium=1 → плеер грузится БЕЗ рекламы
-//   /bridge.js?v=176           → реклама работает как в оригинальном плеере
-// Функциональные фиксы (высота #player, resume-трекинг, перезапись битых
-// CDN-URL в MPD, блок телеметрии myangular) — для всех.
+// v186 — СЛИЯНИЕ с Genopoisk v177..v180 (f090698): апстрим embess поменял
+// пайплайн (x-en-x теперь отдаёт полные MPD вместо компактных
+// session-манифестов) и воспроизведение сломалось для ВСХ фильмов.
+// Рабочая схема (проверена в Genopoisk на проде):
+//   1) МЕДИА-ПРОКСИ /api/media/<enc-url>: CDN (*.interkh.com) отдаёт
+//      манифесты любому IP, но сегменты режет 410 по гео/UA. Бридж
+//      ЗАВОРАЧИВАЕТ каждый interkh-URL (манифесты, сегменты, субтитры,
+//      x-en-x) в прокси на этапе запроса; прокси декодирует шифр x-en-x
+//      и стримит с AWS-egress. Манифесты переписываются на сервере
+//      прокси (rewriteMpd/rewriteM3u8), бридж сквозные НЕ трогает.
+//   2) P2P-движок venoplayer ОТКЛЮЧЁН (RTCPeerConnection скрыт): иначе
+//      он сначала пробует свой WebSocket (wss://ws.getzend.digital/px,
+//      гео-блок для РФ) и висит до 300с без фолбэка. Скрытие →
+//      isSupported=false → все сегменты через XHR → /api/media/.
+//   3) Парсеры fragDash/fragHls фиксятся на сервере embed-edge
+//      (proxy-aware, см. api/embed-edge.js).
+// ПРЕМИУМ-РЕЖИМ: блокировка рекламы — привилегия премиума.
+//   /bridge.js?v=186&premium=1 → плеер БЕЗ рекламы
+//   /bridge.js?v=186           → реклама работает как в оригинале
+// Функциональные фиксы (высота #player, resume, медиа-прокси, P2P) — для всех.
 
 (function() {
   if (window.__filmotivBridge) return;
@@ -29,12 +42,99 @@
     try { parent.postMessage(msg, '*'); } catch(_) {}
   }
 
+  // ====== 0b. Media proxy wrapping (v180, для ВСЕХ) ======
+  // CDN (*.interkh.com) отдаёт манифесты (.mpd/.m3u8/.vtt) любому IP, но
+  // возвращает 410 на СЕГМЕНТЫ с РФ-IP (гео-блок). Same-origin edge-прокси
+  // /api/media/<encoded-url> идёт с неРФ-egress. КАЖДЫЙ interkh-URL
+  // (манифесты, сегменты, субтитры, миниатюры) заворачивается в прокси.
+  // SHAPE: один path-сегмент, encodeURIComponent с сырыми $ { }
+  // (шаблоны dash.js $Number$/$Time$ и ${spriteNum} выживают);
+  // multi-segment пути не маршрутизируются на Vercel, сырой '//' схлопывается
+  // 308-редиректом. Относительные URI сегментов не резолвятся против такого
+  // URL манифеста → тела манифестов переписываются прокси на сервере
+  // (rewriteMpdBody / rewriteM3u8Body — зеркала api/media/[...url].mjs).
+  var PROXY_MARK = '/api/media/';
+  var MEDIA_PROXY = location.origin + PROXY_MARK;
+  var INTERKH_URL_RE = /^https?:\/\/[a-z0-9-]+\.interkh\.com\//i;
+  var ALLOWED_HOST_RE = /^(?:[a-z0-9-]+\.)*(?:interkh\.com|embess\.ws|stiven-king\.com)$/i;
+
+  function encForPath(u) {
+    return encodeURIComponent(u).replace(/%24/g, '$').replace(/%7B/g, '{').replace(/%7D/g, '}');
+  }
+
+  function toProxyUrl(url) {
+    if (typeof url !== 'string' || !url) return null;
+    if (url.indexOf(PROXY_MARK) !== -1) return null; // already proxied
+    if (!INTERKH_URL_RE.test(url)) return null;
+    return MEDIA_PROXY + encForPath(url);
+  }
+
+  function upstreamFromProxy(u) {
+    if (typeof u !== 'string' || u.indexOf(MEDIA_PROXY) !== 0) return null;
+    try { return decodeURIComponent(u.slice(MEDIA_PROXY.length)); } catch (e) { return null; }
+  }
+
+  function resolveUp(u, base) {
+    var s = String(u).replace(/&amp;/g, '&');
+    try {
+      var abs = new URL(s, base).href;
+      return /^https?:\/\//i.test(abs) ? abs : null;
+    } catch (e) { return null; }
+  }
+
+  function isAllowedAbs(u) {
+    try { return ALLOWED_HOST_RE.test(new URL(u).hostname); } catch (e) { return false; }
+  }
+
+  function rewriteMpdBody(text, manifestUrl) {
+    var firstBase = null;
+    text = text.replace(/<BaseURL>([^<]*)<\/BaseURL>/g, function (m, inner) {
+      var abs = resolveUp(inner, manifestUrl);
+      if (!abs || !isAllowedAbs(abs)) return m;
+      if (!firstBase) firstBase = abs;
+      return '<BaseURL>' + MEDIA_PROXY + encForPath(abs) + '</BaseURL>';
+    });
+    var effectiveBase = firstBase || manifestUrl;
+    text = text.replace(/\b(initialization|media|source)="([^"]*)"/g, function (m, attr, val) {
+      if (!val) return m;
+      var abs = resolveUp(val, effectiveBase);
+      if (!abs || !isAllowedAbs(abs)) return m;
+      return attr + '="' + MEDIA_PROXY + encForPath(abs) + '"';
+    });
+    return text.replace(/https?:\/\/[a-z0-9-]+\.interkh\.com\/[^\s"'<>\\]+/gi, function (m) {
+      return MEDIA_PROXY + encForPath(m);
+    });
+  }
+
+  function rewriteM3u8Body(text, playlistUrl) {
+    return text.split('\n').map(function (line) {
+      var trimmed = line.trim();
+      if (!trimmed) return line;
+      if (trimmed.charAt(0) === '#') {
+        return line.replace(/URI="([^"]+)"/g, function (m, val) {
+          var abs = resolveUp(val, playlistUrl);
+          if (!abs || !isAllowedAbs(abs)) return m;
+          return 'URI="' + MEDIA_PROXY + encForPath(abs) + '"';
+        });
+      }
+      var abs = resolveUp(trimmed, playlistUrl);
+      if (!abs || !isAllowedAbs(abs)) return line;
+      return MEDIA_PROXY + encForPath(abs);
+    }).join('\n');
+  }
+
+  function rewriteManifest(text, finalUrl) {
+    var up = upstreamFromProxy(finalUrl) || finalUrl;
+    if (text.indexOf('<MPD') !== -1) return rewriteMpdBody(text, up);
+    if (text.indexOf('#EXTM3U') !== -1) return rewriteM3u8Body(text, up);
+    return text;
+  }
+
   // ====== 0a. Pre-emptively neutralize adsConfig — ТОЛЬКО ПРЕМИУМ ======
   // venoplayer reads window.adsConfig to decide if ads should play.
-  // If adsConfig has pre/middle/post roll URLs, venoplayer enters "ad mode"
-  // and disables fullscreen + shows "fullscreen disabled during ad".
-  // Для НЕ-премиума adsConfig НЕ трогаем — обычные пользователи смотрят
-  // рекламу, как в оригинальном плеере (возврат рекламы по запросу).
+  // Если в adsConfig есть pre/middle/post роллы, venoplayer входит в
+  // «ad mode» и блокирует fullscreen. Для НЕ-премиума adsConfig НЕ трогаем —
+  // реклама играет как в оригинальном плеере.
   if (PREMIUM) {
   var EMPTY_ADS_CONFIG = {
     nonLinear: { fallbackOnly: true, url: '', total: 0, offset: 0 },
@@ -49,24 +149,47 @@
       configurable: true
     });
   } catch(e) { log('adsConfig override failed', e); }
-  } // end PREMIUM: adsConfig override
+  } // end PREMIUM: adsConfig
 
-  // ====== 0. Hide ad / fullscreen-disabled overlays — ТОЛЬКО ПРЕМИУМ ======
-  // Для не-премиума рекламные оверлеи НЕ скрываем — реклама возвращена.
+  // ====== 0c. Disable venoplayer's P2P engine (v180, для ВСЕХ) ======
+  // venoplayer injects a P2P FragmentLoader into dash.js (W.Ay.inject). For
+  // MediaSegments it FIRST tries its own WebSocket file fetcher
+  // (wss://ws.getzend.digital/px, source "ppx") and only falls back to plain
+  // HTTP when that REJECTS — but with the WS unreachable (RU networks) the
+  // request hangs for up to `longDownload` (300s per the embed config) with
+  // no fallback: the video sits at 0 buffer forever even after tapping play.
+  // Removing RTCPeerConnection makes W.Ay.isSupported === false → the engine
+  // never injects → EVERY segment (init + media) loads through the default
+  // XHR loader → cdn.js factory → our media proxy. Deterministic and
+  // region-independent. (Tradeoff: no P2P bandwidth savings — all traffic
+  // flows through the proxy.)
+  try {
+    ['RTCPeerConnection', 'mozRTCPeerConnection', 'webkitRTCPeerConnection'].forEach(function (k) {
+      try {
+        Object.defineProperty(window, k, {
+          get: function () { return undefined; },
+          set: function () {},
+          configurable: true
+        });
+      } catch (e) {}
+    });
+    log('P2P engine disabled (RTCPeerConnection hidden)');
+  } catch (e) { log('P2P disable failed', e); }
+
+  // ====== 0. Hide ad overlays — ТОЛЬКО ПРЕМИУМ ======
+  // Для премиума скрываем рекламные оверлеи и «fullscreen disabled during
+  // ad» сообщения. Управление venoplayer не трогаем (иначе контролы не
+  // появляются по тапу).
   if (PREMIUM) {
   function injectControlsFix() {
     if (document.querySelector('style[data-filmotiv-controls]')) return;
     var css =
-      // Hide ad-related overlays and "fullscreen disabled during ad" messages
-      // + non-linear ad banners (distribrey overlay) and any ad containers
-      '.vp-ad-overlay, .vp-ad-message, .ad-message, [class*="ad-disabled"], [class*="fullscreen-disabled"], ' +
-      '[class*="nonlinear"], [class*="non-linear"], [class*="ad-overlay"], [class*="ad_overlay"], ' +
-      '[class*="ad-banner"], [class*="advert-banner"], .vp-nl, .vp-banner { display:none !important; }';
+      '.vp-ad-overlay, .vp-ad-message, .ad-message, [class*="ad-disabled"], [class*="fullscreen-disabled"] { display:none !important; }';
     var style = document.createElement('style');
     style.setAttribute('data-filmotiv-controls', 'true');
     style.textContent = css;
     (document.head || document.documentElement).appendChild(style);
-    log('Controls fix CSS injected (ad overlays only — venoplayer controls untouched)');
+    log('Controls fix CSS injected (ad overlays only)');
   }
   if (document.head) { injectControlsFix(); }
   else {
@@ -75,24 +198,20 @@
     });
     cObs.observe(document.documentElement, { childList: true, subtree: true });
   }
-  } // end PREMIUM: ad-overlay CSS hiding
-  if (PREMIUM) {
-  // Periodic check: remove ad messages and ensure center button visible
+  // Periodic check: remove ad overlay messages
   setInterval(function() {
-    // Remove ad overlay messages + non-linear banners
-    var adMsgs = document.querySelectorAll('.vp-ad-message, .ad-message, [class*="fullscreen-disabled"], ' +
-      '[class*="nonlinear"], [class*="non-linear"], [class*="ad-overlay"], [class*="ad_overlay"], ' +
-      '[class*="ad-banner"], [class*="advert-banner"], .vp-nl, .vp-banner');
+    var adMsgs = document.querySelectorAll('.vp-ad-message, .ad-message, [class*="fullscreen-disabled"]');
     for (var i = 0; i < adMsgs.length; i++) {
       adMsgs[i].style.display = 'none';
       adMsgs[i].remove();
     }
   }, 1000);
-  } // end PREMIUM: periodic ad cleanup
+  } // end PREMIUM: ad overlays
+
   // venoplayer sets #player height:180px inline. We need:
   // 1. html, body { height:100% } so #player can be height:100%
   // 2. #player { height:100% !important } to override inline 180px
-  // --vp-vh is computed FROM #player height, so this is safe.
+  // --vp-vh is computed FROM #player height, so this is safe. (Для всех.)
   function injectLayoutCSS() {
     if (document.querySelector('style[data-filmotiv-layout]')) return;
     var css =
@@ -119,20 +238,10 @@
   setTimeout(injectLayoutCSS, 5000);
 
   // ====== 1. Block tracking + ad endpoints ======
-  // Список заблокированных сайтов — из репозитория genopoisk (коммит d772e84
-  // «ad block»), расширен по живой странице api.embess.ws и venoplayer:
-  //   - s.myangular.life / stats.myangular.life (stats/telemetry)
-  //   - evr.mzona.net (local ad overlay)
-  //   - distribrey.com — ОСНОВНАЯ рекламная сеть embess: VAST-роллы
-  //     pre/middle/post + nonLinear overlay задаются в inline-скрипте
-  //     страницы плеера (adsConfig.urls = https://distribrey.com/load-xml/...)
-  //   - getsdk.online (пинги «check»), stiven-king.com (storage-sync iframe),
-  //     getaim.org + advertserve.com + 4736.in (телеметрия venoplayer)
-  //   - классические сети: doubleclick, googlesyndication, google-analytics,
-  //     googletagmanager, adsterra, propellerads, taboola, mgid и т.д.
-  // DO NOT block hye1eaipby4w.interkh.com (video CDN), *.zcvh.net (P2P
-  // tracker), api.embess.ws (embed host), cdn.jsdelivr.net / unpkg.com
-  // (player library) — иначе видео не загрузится.
+  // Список — из genopoisk (d772e84) + живая страница api.embess.ws.
+  // БЛОКИРОВКА ТОЛЬКО ДЛЯ ПРЕМИУМА (у обычных реклама играет, как в
+  // оригинале). DO NOT block hye1eaipby4w.interkh.com (video CDN),
+  // *.zcvh.net (P2P tracker), api.embess.ws, cdn.jsdelivr.net / unpkg.com.
   var trackingPattern = new RegExp(
     's\\.myangular\\.life|stats\\.myangular\\.life|myangular\\.life|evr\\.mzona\\.net' +
     '|distribrey\\.com' +
@@ -179,25 +288,22 @@
         log('P2P CDN blocked (network error):', url.slice(0, 100));
         return Promise.reject(new TypeError('Failed to fetch'));
       }
-      // Rewrite segment URLs from broken CDNs to working CDN
-      if (typeof url === 'string') {
-        var newUrl = url.replace(
-          /https:\/\/(ghzbfjzbazc|x-bc)\.interkh\.com/g,
-          'https://hye1eaipby4w.interkh.com'
-        );
-        if (newUrl !== url) {
-          log('fetch URL rewrite:', url.slice(0, 60), '→', newUrl.slice(0, 60));
-          if (typeof input === 'string') {
-            input = newUrl;
-          } else if (input && input.url) {
-            input = new Request(newUrl, input);
-          }
+      // v180: wrap direct CDN URLs into the media proxy (RU geo-block).
+      // NOTE: запрос переиздаётся с НОВЫМ input — старый код переназначал
+      // `input`, но звал оригинал с протухшим `arguments`, и рерайт
+      // молча не применялся.
+      var proxied = toProxyUrl(url);
+      if (proxied) {
+        log('fetch → media proxy:', url.slice(0, 70));
+        if (typeof input === 'string') {
+          input = proxied;
+        } else if (input && input.url) {
+          input = new Request(proxied, input);
         }
+        return origFetch.call(this, input, init).then(function(res) {
+          return wrapManifestResponse(res, proxied);
+        });
       }
-      // Intercept MPD manifest responses and rewrite BaseURL from broken
-      // P2P CDNs (ghzbfjzbazc, x-bc) to the working CDN (hye1eaipby4w).
-      // Also: kill VAST ad XML responses (second line of defense — even if a
-      // new ad domain appears, the player gets an empty VAST and skips it).
       return origFetch.apply(this, arguments).then(function(res) {
         var ct = res.headers.get('content-type') || '';
         // VAST-подмена — только премиум (у обычных реклама играет)
@@ -205,26 +311,43 @@
           log('Blocked VAST response (fetch):', String(res.url || url).slice(0, 100));
           return new Response(EMPTY_VAST, { status: 200, headers: { 'content-type': 'application/xml' } });
         }
-        if (ct.indexOf('dash+xml') !== -1 || ct.indexOf('xml') !== -1) {
-          return res.text().then(function(text) {
-            if (text.indexOf('<MPD') === -1) return res;
-            var rewritten = text.replace(
-              /https:\/\/(ghzbfjzbazc|x-bc)\.interkh\.com/g,
-              'https://hye1eaipby4w.interkh.com'
-            );
-            if (rewritten !== text) {
-              log('Rewrote MPD BaseURL (fetch body): ghzbfjzbazc/x-bc → hye1eaipby4w');
-            }
-            return new Response(rewritten, {
-              status: res.status,
-              statusText: res.statusText,
-              headers: res.headers
-            });
-          });
-        }
-        return res;
+        return wrapManifestResponse(res, url);
       });
     };
+    // MPD/m3u8 ответы: переписываем тела НЕ-проксированных манифестов
+    // (относительные атрибуты пре-резолвятся против исходного base).
+    // v179/v180 (Genopoisk, критично): проксированный манифест УЖЕ
+    // переписан серверной стороной /api/media. res.text() здесь СЪЕЛА бы
+    // тело → cdn.js получил бы «body already used», трактовал манифест как
+    // битый и переключил пайплайн на WebSocket-лоадер (гео-блок РФ) —
+    // видео вообще не грузится. Проксированные тела НЕ ТРОГАЕМ и возвращаем
+    // исходный Response (пересоздание стирает Response.url, который нужен
+    // dash.js — пустой responseURL ставит пайплайн до первого сегмента).
+    function wrapManifestResponse(res, finalUrl) {
+      try {
+        if (!finalUrl || typeof finalUrl !== 'string') return res;
+        if (upstreamFromProxy(finalUrl)) return res; // proxied → already rewritten server-side
+        var ct = res.headers.get('content-type') || '';
+        var manifestish = ct.indexOf('dash+xml') !== -1 || ct.indexOf('xml') !== -1 ||
+          ct.indexOf('mpegurl') !== -1 || /\.(mpd|m3u8)(\?|$)/i.test(finalUrl);
+        if (!manifestish) return res;
+        return res.text().then(function(text) {
+          if (text.indexOf('<MPD') === -1 && text.indexOf('#EXTM3U') === -1) return res;
+          var rewritten = rewriteManifest(text, finalUrl);
+          if (rewritten === text) return res; // no-op → preserve Response.url
+          log('Manifest body → media proxy (fetch)');
+          var h = new Headers(res.headers);
+          try { h.delete('content-length'); } catch(_) {}
+          return new Response(rewritten, {
+            status: res.status,
+            statusText: res.statusText,
+            headers: h
+          });
+        });
+      } catch(e) {
+        return res;
+      }
+    }
   } catch(e) {}
 
   // Override XMLHttpRequest
@@ -234,19 +357,16 @@
     XMLHttpRequest.prototype.open = function(method, url) {
       this._filmotivBlocked = isBlocked(url);
       this._filmotivP2p = isP2pCdn(url);
-      // Rewrite segment URLs from broken CDNs to working CDN.
-      // dash.js constructs segment URLs as BaseURL + SegmentTemplate.
-      // We rewrite them here in open() so the actual request goes to the
-      // working CDN.
+      // v180: wrap direct CDN URLs into the media proxy. dash.js строит
+      // URL сегментов как BaseURL + SegmentTemplate и грузит их XHR —
+      // это главный горячий путь видеосегментов.
       if (typeof url === 'string') {
-        var newUrl = url.replace(
-          /https:\/\/(ghzbfjzbazc|x-bc)\.interkh\.com/g,
-          'https://hye1eaipby4w.interkh.com'
-        );
-        if (newUrl !== url) {
-          log('XHR URL rewrite:', url.slice(0, 60), '→', newUrl.slice(0, 60));
-          url = newUrl;
-          arguments[1] = newUrl;
+        var proxied = toProxyUrl(url);
+        if (proxied) {
+          log('XHR → media proxy:', url.slice(0, 70));
+          arguments[1] = proxied;
+          this._filmotivUrl = proxied;
+          return origOpen.apply(this, arguments);
         }
       }
       this._filmotivUrl = url;
@@ -254,9 +374,8 @@
     };
     XMLHttpRequest.prototype.send = function(body) {
       var self = this;
-      // Second line of defense: even if a blocked VAST slipped through a new
-      // domain, replace the response body with an empty VAST document.
-      // NOTE: responseText throws for blob/arraybuffer responseType — guard it.
+      // Second line of defense (premium): VAST → empty VAST document.
+      // NOTE: responseText throws for blob/arraybuffer responseType — guard.
       this.addEventListener('readystatechange', function() {
         if (!PREMIUM) return; // реклама возвращена обычным пользователям
         if (self.readyState !== 4 || self.status !== 200) return;
@@ -301,21 +420,26 @@
         }, 0);
         return;
       }
-      // Also intercept MPD manifest responses and rewrite BaseURL in body
-      // (guard responseText — it throws for non-text responseType)
-      var mpdHandler = function() {
+      // Манифесты: переписываем тело НЕ-проксированных запросов в медиа-прокси
+      // (относительные атрибуты пре-резолвятся против base). Проксированные
+      // уже переписаны сервером — не трогаем (guard upstreamFromProxy).
+      this.addEventListener('readystatechange', function() {
         if (self.readyState === 4 && self.status === 200) {
-          var rt = self.responseType;
-          if (rt && rt !== 'text') return;
+          var rt = '';
+          try { rt = self.responseType || ''; } catch(_) {}
+          if (rt !== '' && rt !== 'text') return;
+          var finalUrl = String(self._filmotivUrl || '');
+          if (!finalUrl) return;
           var ct = self.getResponseHeader('content-type') || '';
-          if ((ct.indexOf('dash+xml') !== -1 || ct.indexOf('xml') !== -1) &&
-              self.responseText && self.responseText.indexOf('<MPD') !== -1) {
-            var rewritten = self.responseText.replace(
-              /https:\/\/(ghzbfjzbazc|x-bc)\.interkh\.com/g,
-              'https://hye1eaipby4w.interkh.com'
-            );
+          var up = upstreamFromProxy(finalUrl);
+          var manifestish = ct.indexOf('dash+xml') !== -1 || ct.indexOf('xml') !== -1 ||
+            ct.indexOf('mpegurl') !== -1 || /\.(mpd|m3u8)(\?|$)/i.test(finalUrl) ||
+            (up && /\.(mpd|m3u8)/i.test(up));
+          if (manifestish && self.responseText &&
+              (self.responseText.indexOf('<MPD') !== -1 || self.responseText.indexOf('#EXTM3U') !== -1)) {
+            var rewritten = rewriteManifest(self.responseText, finalUrl);
             if (rewritten !== self.responseText) {
-              log('Rewrote MPD BaseURL (XHR body): ghzbfjzbazc/x-bc → hye1eaipby4w');
+              log('Manifest body → media proxy (XHR)');
               try {
                 Object.defineProperty(self, 'responseText', { value: rewritten, configurable: true });
                 Object.defineProperty(self, 'response', { value: rewritten, configurable: true });
@@ -323,15 +447,12 @@
             }
           }
         }
-      };
-      this.addEventListener('readystatechange', mpdHandler);
+      });
       return origSend.apply(this, arguments);
     };
   } catch(e) {}
 
-  // ====== 1b. Block popunders (adsConfig.middle.pop = true) — ТОЛЬКО ПРЕМИУМ ======
-  // Ad scripts open popunders via window.open — kill blocked URLs; a null
-  // return makes their `win.location = ...` throw inside their own try/catch.
+  // ====== 1a. Block popunders (adsConfig.middle.pop) — ТОЛЬКО ПРЕМИУМ ======
   if (PREMIUM) {
   try {
     var origWinOpen = window.open;
@@ -345,20 +466,15 @@
   } catch(e) {}
   } // end PREMIUM: popunder blocker
 
-  // Override WebSocket to block tracking connections only (s.myangular.life).
+  // Override WebSocket: блок телеметрии ВСЕМ (не реклама — чистая консоль).
   // Do NOT block t6.zcvh.net (P2P tracker) — venoplayer needs it.
-  // (Телеметрия, не реклама — блокируем всем: чистая консоль, без рекламных решений.)
-  //
+  // (P2P WS уже нейтрализован скрытием RTCPeerConnection — см. 0c.)
   // For blocked URLs, we return a STUB OBJECT that mimics the WebSocket
-  // interface (readyState, send, close, addEventListener, etc.) but does
-  // nothing. This is silent — no network attempt, no ERR_UNSAFE_PORT error
-  // in console (the previous approach redirected to ws://localhost:0 which
-  // Chrome logs as an unsafe-port error, polluting the debug console).
+  // interface but does nothing — silent, no console errors.
   try {
     var OrigWebSocket = window.WebSocket;
     function BlockedWebSocketStub(url) {
       log('Blocked WebSocket (silent stub):', String(url).slice(0, 100));
-      // Mimic WebSocket constants
       this.readyState = OrigWebSocket.CLOSED; // never opens
       this.url = url;
       this.extensions = '';
@@ -369,7 +485,6 @@
       this.onclose = null;
       this.onerror = null;
       this.onmessage = null;
-      // Stub methods — all no-ops
       this.send = function() {};
       this.close = function() {};
       this.addEventListener = function() {};
@@ -392,6 +507,50 @@
     WrappedWebSocket.CLOSED = OrigWebSocket.CLOSED;
     window.WebSocket = WrappedWebSocket;
   } catch(e) { log('WebSocket override failed', e); }
+
+  // ====== 1b. Rewrite media URLs on DOM elements (v180, для ВСЕХ) ======
+  // venoplayer ставит <img src> (спрайты), <track src> (субтитры) и иногда
+  // <video src>/<source src> (нативный HLS на iOS) НАПРЯМУЮ — мимо fetch/XHR
+  // хуков. Наблюдатель переписывает interkh URL в прокси до запроса.
+  function proxifyElement(el) {
+    try {
+      if (!el || el.nodeType !== 1) return;
+      var tag = el.tagName;
+      if (tag !== 'IMG' && tag !== 'TRACK' && tag !== 'SOURCE' &&
+          tag !== 'VIDEO' && tag !== 'AUDIO') return;
+      var raw = el.getAttribute && el.getAttribute('src');
+      if (!raw) return;
+      var proxied = toProxyUrl(raw);
+      if (proxied) {
+        el.setAttribute('src', proxied);
+        log('Element src → media proxy:', tag, raw.slice(0, 60));
+      }
+    } catch(e) {}
+  }
+  var mediaObs = new MutationObserver(function(mutations) {
+    for (var i = 0; i < mutations.length; i++) {
+      var mu = mutations[i];
+      if (mu.type === 'attributes') {
+        proxifyElement(mu.target);
+      } else {
+        var added = mu.addedNodes;
+        for (var j = 0; j < added.length; j++) {
+          var node = added[j];
+          if (node.nodeType !== 1) continue;
+          proxifyElement(node);
+          if (node.querySelectorAll) {
+            var inner = node.querySelectorAll('img, track, source, video, audio');
+            for (var k = 0; k < inner.length; k++) proxifyElement(inner[k]);
+          }
+        }
+      }
+    }
+  });
+  try {
+    mediaObs.observe(document.documentElement, {
+      childList: true, subtree: true, attributes: true, attributeFilter: ['src']
+    });
+  } catch(e) { log('media observer failed', e); }
 
   // ====== 2. MutationObserver: remove ad/tracking nodes — ТОЛЬКО ПРЕМИУМ ======
   if (PREMIUM) {

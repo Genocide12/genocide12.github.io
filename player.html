@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://api.embess.ws" crossorigin>
   <link rel="dns-prefetch" href="https://api.embess.ws">
   <script src="/i18n.js"></script>
-  <script src="/js/api-origin.js?v=185"></script>
+  <script src="/js/api-origin.js?v=186"></script>
   <!-- Vercel Web Analytics убран из плеера (v184): EasyList/адблоки режут
        cdn.vercel-insights.com/v1/script.js → ERR_BLOCKED_BY_CLIENT в консоли -->
   <title>Плеер</title>
@@ -132,6 +132,8 @@
     .btn:active { background:rgba(139,92,246,0.30); transform: scale(0.96); }
     .btn-close { background:rgba(251,113,133,0.18); border-color:rgba(251,113,133,0.30); color:#fb7185; margin-left:4px; }
     .btn-close:active { background:rgba(251,113,133,0.45); transform: scale(0.96); }
+    .btn-src { background:rgba(139,92,246,0.16); border-color:rgba(139,92,246,0.32); color:#a78bfa; font-size:16px; width:36px; height:36px; display:flex; align-items:center; justify-content:center; padding:0; }
+    .btn-src:active { background:rgba(139,92,246,0.42); transform: scale(0.94); }
     .btn-fav { background:rgba(236,72,153,0.16); border-color:rgba(236,72,153,0.30); color:#ec4899; font-size:20px; width:36px; height:36px; display:flex; align-items:center; justify-content:center; transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.2s; box-shadow:0 0 16px rgba(236,72,153,0.18); }
     .btn-fav.active { background:rgba(255,45,85,0.45); color:#fff; }
     .btn-fav:active { transform: scale(0.92); }
@@ -371,6 +373,7 @@
   <div class="player-header" id="playerHeader">
     <span class="title" id="videoTitle">Загрузка...</span>
     <div class="btn-group">
+      <button class="btn btn-src" id="srcBtn" title="Сменить плеер: оригинальный ↔ резервный">⇄</button>
       <button class="btn btn-fav" id="favBtn" title="В избранное">❤</button>
       <button class="btn btn-close" id="closeBtn" title="Закрыть">✕</button>
     </div>
@@ -409,6 +412,7 @@
         <div class="pe-sub" id="peSub">Источник не вернул видео. Уже пробуем другие зеркала автоматически — обычно помогает за пару минут.</div>
         <div class="pe-btns">
           <button class="pe-btn pe-primary" id="peRetry">⟳ Ещё раз</button>
+          <button class="pe-btn" id="peAlt">⇄ Резервный плеер</button>
           <button class="pe-btn" id="peClose">✕ Закрыть</button>
         </div>
       </div>
@@ -419,13 +423,19 @@
     (function bindCloseButtonEarly() {
       var btn = document.getElementById('closeBtn');
       if (!btn) return;
-      function goHome() {
-        try { window.location.href = '/'; } catch (e) {
-          try { window.location.replace('/'); } catch (_) {}
+      function goHome(ev) {
+        try { if (ev && ev.cancelable) { ev.preventDefault(); ev.stopPropagation(); } } catch (_) {}
+        // КРЕСТИК ВСЕГДА закрывает плеер и возвращает на главную:
+        // не history.back (плеер мог открыться напрямую/из Telegram),
+        // а явный переход на корень текущего origin.
+        var home = '/';
+        try { home = new URL('/', location.href).href; } catch (_) {}
+        try { window.location.replace(home); } catch (e) {
+          try { window.location.href = home; } catch (_) {}
         }
       }
       btn.addEventListener('click', goHome);
-      btn.addEventListener('touchend', function(e) { e.preventDefault(); goHome(); });
+      btn.addEventListener('touchend', function(e) { goHome(e); }, { passive: false });
     })();
 
     // ====== Phase 2: Player logic ======
@@ -827,6 +837,7 @@
 
       if (data.type === 'bridge_ready') {
         console.log('[player] Bridge ready');
+        __bridgeArrived = true; // сигнал успеха для edge-канала (poll)
         loadingOverlay.classList.add('hidden');
       }
       if (data.type === 'ready' || data.type === 'loaded') {
@@ -835,13 +846,17 @@
         loadingOverlay.classList.add('hidden');
         if (typeof data.duration === 'number' && data.duration > 0) {
           lastKnownDuration = data.duration;
+          __metaArrived = true;
         }
         // Start seek retry loop
         setTimeout(attemptSeekToSaved, 500);
       }
       if (data.type === 'timeupdate' || data.type === 'currentTime') {
         if (typeof data.currentTime === 'number') lastKnownTime = data.currentTime;
-        if (typeof data.duration === 'number' && data.duration > 0) lastKnownDuration = data.duration;
+        if (typeof data.duration === 'number' && data.duration > 0) {
+          lastKnownDuration = data.duration;
+          __metaArrived = true;
+        }
         maybeSavePosition(lastKnownTime);
       }
       if (data.type === 'seeked') {
@@ -903,25 +918,35 @@
       if (document.visibilityState === 'hidden') saveBeforeLeave();
     });
 
-    // ====== Load player via browser fetch + srcdoc (with bridge) ======
+    // ====== Загрузка плеера v186 — ТРИ КАНАЛА (порт решения Genopoisk v180) ======
+    // Апстрим embess поменял пайплайн (x-en-x теперь отдаёт полные MPD вместо
+    // компактных session-манифестов) — старая клиентская схема сломалась.
+    // Рабочая схема проверена на проде Genopoisk (f090698, общий владелец):
+    //   КАНАЛ 1 (ГЛАВНЫЙ, «оригинальный плеер») — Edge-прокси /api/embed-edge
+    //     (runtime 'edge', egress из CDN PoP, НЕ из лямбда-AWS): api.embess.ws
+    //     блокирует дата-центр IP (410), но пропускает PoP-IP (замер 7/7).
+    //     IP клиента не участвует (не троттлится!), мост внедряется на
+    //     сервере, медиа идёт через /api/media (AWS-egress — CDN режет
+    //     PoP-IP на сегментах). iframe.src = edge-прокси, успех — по
+    //     bridge_ready (до 7с). Реклама блокируется у премиума (бридж).
+    //   КАНАЛ 2 (резерв) — клиентская серия по 6 зеркалам семейства
+    //     (srcdoc + мост), паузы 1.2с между хостами против флага частоты.
+    //   КАНАЛ 3 (резерв «на всякий случай») — FlixCDN прямым iframe
+    //     (его API работает только со своим origin — srcdoc не воспроизводит
+    //     видео; X-Frame-Options нет). Без моста: СВОЯ реклама, без resume.
+    //     Доступен и кнопкой ⇄ в шапке (смена БЕЗ перезагрузки страницы).
     // Bridge.js tracks video.currentTime via postMessage and handles seek
     // for resume playback. venoplayer does NOT support ?t= URL parameter,
     // so we need bridge to call video.currentTime = X after metadata loads.
-    //
-    // IMPORTANT: bridge.js does NOT inject layout CSS (it broke venoplayer).
-    // venoplayer manages its own layout naturally.
-    //
     // ПРЕМИУМ (v176): реклама возвращена обычным пользователям, у премиума —
-    // без рекламы. Бридж грузится с &premium=1 только для премиума.
-    //
-    // РЕТРАИ (v181 — причина «плеер перестал работать»): embess ОТВЕЧАЕТ 422
-    // (пустое тело) на «горячий» IP — троттлинг, один и тот же фильм
-    // мигрирует 200 <-> 422 между запросами. Раньше делали ОДНУ попытку →
-    // почти всегда 422 → пусто. Теперь до 7 попыток с бэкоффом
-    // (0.4+0.9+1.8+3.2+5+7.5 сек), 404 = фильма правда нет (без ретраев).
+    // без рекламы. Бридж грузится с &premium=1 только для премиума
+    // (параметр проксируется и в edge-канал).
     var loadStartTime = performance.now();
     var __playStarted = false;   // видео уже началось — не перезагружаем iframe
     var __bridgePremium = false; // какой бридж сейчас в iframe
+    var __bridgeArrived = false; // bridge_ready получен (srcdoc ИЛИ edge-iframe)
+    var __metaArrived = false;   // метаданные видео получены (длительность > 0)
+    var __srcMode = 'original';  // 'original' | 'backup' — кнопка ⇄ в шапке
     (function() {
       window.addEventListener('message', function(e) {
         var d = e.data;
@@ -932,27 +957,14 @@
     function premiumCached() {
       try { return localStorage.getItem('filmotiv_is_premium') === '1'; } catch (_) { return false; }
     }
-    // ====== ПРОВАЙДЕРЫ ПЛЕЕРА (v183 — корень «плеер не загружается») ======
+    // ====== ПРОВАЙДЕРЫ ПЛЕЕРА (КАНАЛ 2 — клиентский резерв) ======
     // embess.ws — не единственный агрегатор: это СЕМЕЙСТВО зеркал с одним
     // форматом /embed/kp/{id} (atomics/marts/domem/namy — обнаружено в
-    // kinoserver.py проекта reyohoho). Ключевое наблюдение: 422-троттлинг
-    // ГУЛЯЕТ между хостами — когда embess «горячий», atomics отвечает 200,
-    // и наоборот (проверено live: один и тот же kp_id 200↔422 в разные
-    // минуты). Поэтому вместо ретраев в ОДИН хост — обход цепочки хостов.
-    // ВАЖНО: в v181/v182 новый loadPlayer был перекрыт старой копией функции
-    // ниже по файлу (function hoisting) — ретраи фактически никогда не
-    // работали. Дубль удалён, теперь цепочка здесь.
-    //
-    // ДВЕ фазы (v185). Серверная фаза v184 (_embed-fetch) УДАЛЕНА
-    // из цепочки: живой замер показал 502 за 12с — анти-бот семейства режет
-    // ВСЕ дата-центр IP (410), а Cloudflare-фронты отказывают бесплатным
-    // прокси и релеям (refused/520/522). Семейство берётся ТОЛЬКО из
-    // браузера. Эндпоинт _embed-fetch оставлен как диагностика.
-    //   ФАЗА 1 — браузерные запросы к 6 зеркалам семейства (IP остаётся
-    //            «холодным»: фильтр доступности их больше не греет);
-    //   ФАЗА 2 — FlixCDN ПРЯМЫМ iframe (его API работает только со своим
-    //            origin — поэтому srcdoc-обёртка v184 не воспроизводила
-    //            видео; X-Frame-Options нет — проверено). Без бриджа.
+    // kinoserver.py проекта reyohoho). 422-троттлинг ГУЛЯЕТ между хостами —
+    // когда embess «горячий», atomics отвечает 200, и наоборот.
+    // Серверная фаза v184 (_embed-fetch) и «две фазы v185» ушли: главный
+    // канал теперь edge-прокси (Канал 1), семейство — клиентский резерв
+    // (Канал 2), FlixCDN — последний рубеж (Канал 3).
     var PLAYER_PROVIDERS = [
       { label: 'embess',   fetch: 'https://api.embess.ws/embed/kp/',            base: 'https://api.embess.ws/' },
       { label: 'atomics0', fetch: 'https://api1690380040.atomics.ws/embed/kp/', base: 'https://api1690380040.atomics.ws/' },
@@ -987,21 +999,19 @@
       } catch (_) {}
     }
 
-    // Две фазы. onHtml(html, provider) — HTML для srcdoc (семейство),
-    // onIframe(url) — прямой iframe (FlixCDN), onFail(allMissing).
-    // 404 всего семейства = «точно нет» (каталог общий) — финал без FlixCDN.
-    function tryChain(onHtml, onIframe, onFail) {
+    // Клиентская серия по семейству. onHtml(html, provider) — HTML для
+    // srcdoc; onFail(allMissing) — всё исчерпано. 404 всего семейства =
+    // «точно нет» (каталог общий). Пауза 1.2с между хостами: анти-бот
+    // наказывает ЧАСТОТУ (рапид-файр углубляет флаг IP; замер Genopoisk:
+    // серия 6×2с → 0/10 успехов), одиночные попытки проходят ~50%.
+    function tryChain(onHtml, onFail) {
       var start = __providerStart++ % PLAYER_PROVIDERS.length;
       var missing = 0;
       var i = 0;
-      function phase2() {
-        console.log('[player] FlixCDN → прямой iframe (без бриджа)');
-        onIframe(FLIXCDN_URL + encodeURIComponent(kid));
-      }
       (function next() {
+        if (__playStarted) return;
         if (i >= PLAYER_PROVIDERS.length) {
-          if (missing >= PLAYER_PROVIDERS.length) { onFail(true); return; }
-          phase2();
+          onFail(missing >= PLAYER_PROVIDERS.length);
           return;
         }
         var p = PLAYER_PROVIDERS[(start + i) % PLAYER_PROVIDERS.length];
@@ -1013,11 +1023,11 @@
           throw new Error('HTTP ' + res.status);
         }).then(function(html) {
           onHtml(html, p);
-        }).catch(function() { next(); });
+        }).catch(function() { setTimeout(next, 1200); });
       })();
     }
     function buildPlayerHtml(html, baseHref) {
-      var bridgeTag = '<script src="https://' + window.location.host + '/bridge.js?v=185' + (__bridgePremium ? '&premium=1' : '') + '"><\/script>';
+      var bridgeTag = '<script src="https://' + window.location.host + '/bridge.js?v=186' + (__bridgePremium ? '&premium=1' : '') + '"><\/script>';
       var baseTag = '<base href="' + (baseHref || 'https://api.embess.ws/') + '">';
       var referrerMeta = '<meta name="referrer" content="no-referrer">';
       if (/<head[^>]*>/i.test(html)) {
@@ -1040,42 +1050,116 @@
       reportAvailable(true);
     }
     // Резервная линия (FlixCDN): прямой iframe, свой origin — их API работает,
-    // но бриджа там нет (resume/премиум-зачистка не действуют).
-    function onPlayerIframe(url) {
+    // но бриджа там нет (resume/блокировка рекламы не действуют).
+    function onPlayerIframe(url, label) {
       if (__playStarted) return;
-      console.log('[player] OK via flixcdn-iframe in', ((performance.now() - loadStartTime) / 1000).toFixed(2) + 's');
+      console.log('[player] OK via', label || 'flixcdn-iframe', 'in', ((performance.now() - loadStartTime) / 1000).toFixed(2) + 's');
       iframe.removeAttribute('srcdoc');
       iframe.src = url;
       hidePlayerError();
       loadingOverlay.classList.add('hidden');
-      showToast('Подключён резервный источник видео', 2500);
+      if (label) showToast('Подключён резервный источник видео (без блокировки рекламы)', 2600);
     }
-    function loadPlayer(premium) {
-      __bridgePremium = !!premium;
-      console.log('[player] load start, premium =', !!premium);
-      __bgRetry.gen++; // гасим возможный фоновый ретрай от прошлого запуска
-      hidePlayerError();
-      loadingOverlay.classList.remove('hidden');
-      iframe.removeAttribute('src'); // сброс прямого iframe прошлой попытки
-      tryChain(function(html, p) {
-        onPlayerHtmlReady(html, p, false);
-      }, function(url) {
-        onPlayerIframe(url);
-      }, function(allMissing) {
-        if (allMissing) {
-          console.warn('[player] все зеркала семейства дали 404 → фильма нет');
-          showPlayerError('missing');
-          return;
-        }
-        console.warn('[player] семейство 422/сеть и FlixCDN не помогли → экран ошибки + фоновые ретраи');
-        showPlayerError('throttled');
-        startBgRetry();
+    function setProgress(msg) {
+      var el = document.getElementById('loadingSubtitle');
+      if (el) el.textContent = msg;
+    }
+
+    // КАНАЛ 1 — edge-прокси: iframe.src = /api/embed-edge (мост внедряется
+    // на сервере, IP клиента не участвует). Успех — по bridge_ready /
+    // метаданным (poll 250мс, таймаут timeoutMs). Возврат true/false.
+    function edgeEmbedUrl() {
+      var p = '/api/embed-edge?id=' + encodeURIComponent(kid) + (__bridgePremium ? '&premium=1' : '');
+      return (window.FilmotivAPIOrigin ? window.FilmotivAPIOrigin.edgeUrl(p) : p);
+    }
+    function tryEdgeProxy(timeoutMs) {
+      return new Promise(function(resolve) {
+        if (__bridgeArrived || __metaArrived || __playStarted) return resolve(true);
+        iframe.removeAttribute('srcdoc');
+        iframe.src = edgeEmbedUrl();
+        var t0 = Date.now();
+        (function poll() {
+          if (__bridgeArrived || __metaArrived || __playStarted) return resolve(true);
+          if (Date.now() - t0 >= timeoutMs) return resolve(false);
+          setTimeout(poll, 250);
+        })();
       });
     }
-    // v183: фоновые ретраи при долгом троттлинге — раз в 15с до 12 попыток
-    // (~3 мин). Каждый тик обходит цепочку провайдеров заново (старт
-    // ротируется), 422 обычно отпускает в течение минуты. Когда fetch
-    // удаётся, плеер сам подменяется на рабочую версию.
+
+    // Watchdog: если после успешного канала видео так и не стартовало за
+    // 25с (манифест/CDN недоступны для этого клиента) — экран ошибки +
+    // фоновые ретраи, вместо вечного чёрного экрана.
+    function startVideoWatchdog() {
+      setTimeout(function() {
+        if (__srcMode !== 'original' || __playStarted) return;
+        if (!__metaArrived && !__bridgeArrived) {
+          console.warn('[player] watchdog: видео не отвечает за 25с → экран ошибки');
+          showPlayerError('throttled');
+          startBgRetry();
+        }
+      }, 25000);
+    }
+
+    // Полный обход каналов ОРИГИНАЛЬНОГО плеера: edge → семейство → FlixCDN.
+    // onDone(source) — что-то загрузилось. gen замыкается на момент входа:
+    // смена режима/перезапуск (loadPlayer) отменяет текущую цепочку.
+    function runOriginalChain(onDone) {
+      var gen = __bgRetry.gen;
+      setProgress('Подключение к источнику…');
+      tryEdgeProxy(7000).then(function(edgeOk) {
+        if (gen !== __bgRetry.gen || __playStarted) return;
+        if (edgeOk) {
+          reportAvailable(true);
+          onDone('edge-proxy');
+          return;
+        }
+        console.warn('[player] edge-прокси не ответил за 7с — резервы');
+        setProgress('Источник занят — пробуем зеркала…');
+        tryChain(function(html, p) {
+          if (gen !== __bgRetry.gen || __playStarted) return;
+          onPlayerHtmlReady(html, p, false);
+          onDone(p.label);
+        }, function(allMissing) {
+          if (gen !== __bgRetry.gen || __playStarted) return;
+          if (allMissing) {
+            console.warn('[player] все зеркала семейства дали 404 → фильма нет');
+            showPlayerError('missing');
+            return;
+          }
+          console.warn('[player] семейство исчерпано → FlixCDN (резерв)');
+          onPlayerIframe(FLIXCDN_URL + encodeURIComponent(kid), 'Резерв');
+          onDone('flixcdn');
+        });
+      });
+    }
+
+    function loadPlayer(premium) {
+      __bridgePremium = !!premium;
+      __bridgeArrived = false;
+      __metaArrived = false;
+      console.log('[player] load start, mode =', __srcMode, ', premium =', !!premium);
+      __bgRetry.gen++; // гасим возможный фоновый ретрай от прошлого запуска
+      if (__bgRetry.timer) { clearInterval(__bgRetry.timer); __bgRetry.timer = null; }
+      hidePlayerError();
+      loadStartTime = performance.now();
+      iframe.removeAttribute('src');
+      iframe.removeAttribute('srcdoc');
+      if (__srcMode === 'backup') {
+        // РЕЗЕРВНЫЙ плеер (кнопка ⇄): FlixCDN сразу, без длинных ожиданий
+        onPlayerIframe(FLIXCDN_URL + encodeURIComponent(kid), 'Резерв');
+        return;
+      }
+      loadingOverlay.classList.remove('hidden');
+      runOriginalChain(function(source) {
+        console.log('[player] OK via', source, 'in', ((performance.now() - loadStartTime) / 1000).toFixed(2) + 's');
+        loadingOverlay.classList.add('hidden');
+        hidePlayerError();
+        startVideoWatchdog();
+      });
+    }
+    // Фоновые ретраи при неудаче — раз в 15с до 12 попыток (~3 мин). Каждый
+    // тик снова обходит ВСЕ каналы (edge обычно оживает первым — серверный
+    // egress не зависит от IP пользователя).
     var __bgRetry = { gen: 0, timer: null };
     function startBgRetry() {
       var gen = ++__bgRetry.gen;
@@ -1093,19 +1177,15 @@
           return;
         }
         if (sub) sub.textContent = 'Пробуем ещё раз автоматически (' + tries + '/12)…';
-        tryChain(function(html, p) {
+        runOriginalChain(function(source) {
           if (gen !== __bgRetry.gen || __playStarted) return;
           if (__bgRetry.timer) { clearInterval(__bgRetry.timer); __bgRetry.timer = null; }
-          console.log('[player] Bg retry OK via', p.label, 'after', tries, 'tries → srcdoc');
-          onPlayerHtmlReady(html, p, false);
+          console.log('[player] Bg retry OK via', source, 'after', tries, 'tries');
+          loadingOverlay.classList.add('hidden');
+          hidePlayerError();
           showToast('Плеер загрузился — приятного просмотра!', 2500);
-        }, function(url) {
-          if (gen !== __bgRetry.gen || __playStarted) return;
-          if (__bgRetry.timer) { clearInterval(__bgRetry.timer); __bgRetry.timer = null; }
-          console.log('[player] Bg retry → flixcdn-iframe после', tries, 'попыток');
-          onPlayerIframe(url);
-          showToast('Плеер загрузился — приятного просмотра!', 2500);
-        }, function() { /* фоновый тик — молча ждём следующего */ });
+          startVideoWatchdog();
+        });
       }, 15000);
     }
     function fetchPremium() {
@@ -1321,7 +1401,7 @@
         if (s) s.textContent = 'Источник пока не добавил этот фильм. Откройте другой фильм или попробуйте позже.';
       } else {
         if (t) t.textContent = 'Плеер недоступен';
-        if (s) s.textContent = 'Источник временно перегружен. Пробуем ещё раз автоматически — обычно проходит за пару минут.';
+        if (s) s.textContent = 'Источник временно перегружен. Уже пробуем другие каналы автоматически — обычно проходит за пару минут. Можно переключиться на резервный плеер кнопкой ⇄ в шапке.';
       }
       el.classList.add('visible');
     }
@@ -1332,7 +1412,26 @@
     var peRetry = document.getElementById('peRetry');
     if (peRetry) peRetry.addEventListener('click', function() { hidePlayerError(); loadingOverlay.classList.remove('hidden'); loadPlayer(__bridgePremium); });
     var peClose = document.getElementById('peClose');
-    if (peClose) peClose.addEventListener('click', function() { window.location.href = '/'; });
+    if (peClose) peClose.addEventListener('click', function() {
+      try { window.location.replace(new URL('/', location.href).href); } catch (_) { window.location.href = '/'; }
+    });
+    // «Резервный плеер» на экране ошибки: смена канала БЕЗ перезагрузки
+    // страницы (как и кнопка ⇄ в шапке)
+    var peAlt = document.getElementById('peAlt');
+    if (peAlt) peAlt.addEventListener('click', function() {
+      __srcMode = 'backup';
+      hidePlayerError();
+      loadPlayer(__bridgePremium || premiumCached());
+    });
+    // Кнопка ⇄ в шапке: оригинальный ↔ резервный, страница НЕ перезагружается
+    var srcBtn = document.getElementById('srcBtn');
+    if (srcBtn) srcBtn.addEventListener('click', function() {
+      __srcMode = (__srcMode === 'original') ? 'backup' : 'original';
+      showToast(__srcMode === 'backup'
+        ? 'Резервный плеер — без блокировки рекламы'
+        : 'Оригинальный плеер', 2200);
+      loadPlayer(__bridgePremium || premiumCached());
+    });
   </script>
 </body>
 </html>

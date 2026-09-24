@@ -115,6 +115,16 @@
     return (c && c !== '' ? c : VERCEL) + path;
   }
 
+  // Абсолютный URL для Edge-прокси плеера (/api/embed-edge, /api/media/...).
+  // На vercel-хостах — same-origin; на зеркале — лучшее доступное
+  // происхождение (залипшее в localStorage или первое из списка). Если
+  // происхождение мертво, плеер уйдёт по цепочке дальше (семейство/FlixCDN).
+  function edgeUrl(path) {
+    if (isVercelHost()) return path;
+    var list = origins();
+    return (list[0] || VERCEL) + path;
+  }
+
   // Авто-переход на зеркало при недоступности прод-API (только на vercel).
   function watchRedirect() {
     if (!/(^|\.)vercel\.app$/.test(location.hostname)) return;
