@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, maximum-scale=1, minimum-scale=1">
+  <meta name="theme-color" content="#08080d">
+  <title>Смотреть фильм онлайн — Filmotiv</title>
+  <meta name="description" content="Смотрите фильм онлайн в хорошем качестве на Filmotiv. Бесплатные фильмы онлайн.">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://filmotiv.vercel.app/">
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
+  <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
+  <link rel="manifest" href="/manifest.json">
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="video.movie">
+  <meta property="og:title" content="Смотреть фильм — Filmotiv">
+  <meta property="og:description" content="Смотрите фильм онлайн бесплатно в хорошем качестве. Онлайн-сервис.">
+  <!-- og:image removed 2026-09-17 (user request: the file was deleted from
+       the repo — no preview image should load in chats/link unfurls). -->
+  <meta property="og:site_name" content="Filmotiv">
+  <meta property="og:locale" content="ru_RU">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Смотреть фильм — Filmotiv">
+  <meta name="twitter:description" content="Смотрите фильм онлайн бесплатно в хорошем качестве.">
+  <meta name="twitter:image" content="https://filmotiv.vercel.app/icon-512.png">
+
+  <style>
+    /* ============ FILMOTIV × ADHD OS ============ */
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    :root {
+      --bg: #08080d; --muted: #92929f;
+      --purple: #8b5cf6; --pink: #ec4899; --blue: #38bdf8;
+      --yellow: #facc15; --radius: 24px;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: #fff; line-height: 1.6;
+      min-height: 100vh;
+      padding: max(18px, env(safe-area-inset-top)) 18px 40px;
+      overflow-x: hidden;
+    }
+    /* Living background — floating neon orbs (1:1 с прототипом) */
+    .background { position: fixed; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
+    .orb { position: absolute; border-radius: 50%; filter: blur(70px); opacity: .28; animation: adhdFloatOrb 12s ease-in-out infinite alternate; will-change: transform; }
+    .orb.one { width: 260px; height: 260px; background: var(--purple); top: -100px; left: -80px; }
+    .orb.two { width: 220px; height: 220px; background: var(--pink); right: -80px; top: 30%; animation-delay: -4s; }
+    .orb.three { width: 280px; height: 280px; background: var(--blue); bottom: -140px; left: 20%; animation-delay: -7s; }
+    @keyframes adhdFloatOrb {
+      from { transform: translate(0,0) scale(1); }
+      to { transform: translate(40px,-30px) scale(1.2); }
+    }
+    @media (prefers-reduced-motion: reduce) { .orb { animation: none; } }
+
+    .container { position: relative; z-index: 1; max-width: 430px; width: 100%; margin: 0 auto; }
+
+    /* Back pill — как secondary-кнопка прототипа */
+    .back-pill {
+      display: inline-flex; align-items: center; gap: 7px;
+      padding: 10px 15px; margin-bottom: 14px;
+      border-radius: 15px;
+      background: rgba(255,255,255,.09);
+      border: 1px solid rgba(255,255,255,.10);
+      color: #fff; text-decoration: none;
+      font-size: 13px; font-weight: 700;
+      backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px);
+      transition: .2s;
+    }
+    .back-pill:active { transform: scale(.96); }
+
+    .adhd-card {
+      background:
+        linear-gradient(135deg, rgba(139,92,246,.28), rgba(236,72,153,.12)),
+        rgba(255,255,255,.075);
+      border: 1px solid rgba(255,255,255,.10);
+      border-radius: var(--radius);
+      backdrop-filter: blur(22px);
+      -webkit-backdrop-filter: blur(22px);
+      padding: 18px;
+      box-shadow:
+        0 0 40px rgba(139,92,246,.18),
+        0 12px 50px rgba(0,0,0,.2),
+        inset 0 1px 0 rgba(255,255,255,.07);
+      position: relative;
+      overflow: hidden;
+      animation: pageIn .35s ease;
+    }
+    /* Neon blob in the corner — quest-card signature */
+    .adhd-card::after {
+      content: "";
+      position: absolute;
+      width: 100px; height: 100px;
+      right: -40px; top: -40px;
+      background: var(--purple);
+      filter: blur(50px);
+      opacity: .35;
+      pointer-events: none;
+    }
+    @keyframes pageIn {
+      from { opacity: 0; transform: translateX(18px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+    .eyebrow {
+      color: var(--muted); font-size: 12px; font-weight: 700;
+      letter-spacing: .12em; text-transform: uppercase;
+    }
+    .poster-wrap {
+      width: min(58%, 190px);
+      margin: 16px auto 6px;
+      border-radius: 18px;
+      overflow: hidden;
+      aspect-ratio: 2 / 3;
+      background: rgba(255,255,255,.06);
+      border: 1px solid rgba(255,255,255,.12);
+      box-shadow: 0 18px 50px rgba(0,0,0,.45), 0 0 34px rgba(139,92,246,.22);
+    }
+    .poster { width: 100%; height: 100%; object-fit: cover; display: block; opacity: 0; transition: opacity .4s ease; }
+    .poster.loaded { opacity: 1; }
+    .title {
+      font-size: 24px; font-weight: 800; letter-spacing: -.035em;
+      line-height: 1.2; margin: 14px 0 14px; text-align: center;
+    }
+    .stats { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-bottom: 14px; }
+    .stat {
+      background: rgba(255,255,255,.055);
+      border: 1px solid rgba(255,255,255,.10);
+      border-radius: 18px;
+      padding: 12px 8px;
+      text-align: center;
+      min-width: 0;
+    }
+    .stat-value {
+      font-size: 19px; font-weight: 900; letter-spacing: -.02em;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .stat-label { color: var(--muted); font-size: 10.5px; margin-top: 3px; }
+    .desc { font-size: 14px; color: var(--muted); margin-bottom: 20px; line-height: 1.55; text-align: center; }
+    .btn {
+      display: block; width: 100%;
+      background: linear-gradient(135deg, var(--purple) 0%, var(--pink) 100%);
+      color: #fff; text-decoration: none; padding: 17px 32px; border-radius: 18px;
+      font-size: 16px; font-weight: 800; letter-spacing: -.01em; border: 1px solid rgba(255,255,255,.16); cursor: pointer; font-family: inherit;
+      box-shadow: 0 12px 35px rgba(139,92,246,.28), inset 0 1px 0 rgba(255,255,255,.15);
+      -webkit-tap-highlight-color: transparent;
+      transition: .2s;
+    }
+    .btn:active { transform: scale(.96); }
+    .loading { font-size: 12px; color: var(--muted); margin-top: 16px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; text-align: center; }
+    /* ADHD OS confetti */
+    .adhd-confetti { position: fixed; z-index: 9998; width: 8px; height: 14px; border-radius: 2px; pointer-events: none; animation: adhdConfettiFall 1.3s ease-out forwards; }
+    @keyframes adhdConfettiFall {
+      0% { transform: translate(0,0) rotate(0); opacity: 1; }
+      100% { transform: translate(calc((var(--x) - .5) * 400px), 600px) rotate(720deg); opacity: 0; }
+    }
+    @media (max-width: 400px) {
+      .title { font-size: 21px; }
+      .stats { gap: 7px; }
+      .stat-value { font-size: 16px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="background" aria-hidden="true">
+    <div class="orb one"></div>
+    <div class="orb two"></div>
+    <div class="orb three"></div>
+  </div>
+  <div class="container">
+    <a class="back-pill" href="/">← На главную</a>
+    <div class="adhd-card">
+      <div class="eyebrow" style="text-align:center;">🎬 Cinema OS · Каталог</div>
+      <div class="poster-wrap"><img class="poster" id="filmPoster" alt="Постер фильма"></div>
+      <h1 class="title" id="filmTitle">Загрузка фильма...</h1>
+      <div class="stats">
+        <div class="stat"><div class="stat-value" id="filmRating">—</div><div class="stat-label">рейтинг</div></div>
+        <div class="stat"><div class="stat-value" id="filmYear">—</div><div class="stat-label">год</div></div>
+        <div class="stat"><div class="stat-value" id="filmLength">—</div><div class="stat-label">время</div></div>
+      </div>
+      <p class="desc" id="filmDesc">Бесплатные фильмы онлайн. Смотрите фильмы онлайн в хорошем качестве.</p>
+      <button class="btn" id="watchBtn" onclick="redirectToPlayer()">▶ СМОТРЕТЬ ФИЛЬМ</button>
+      <div class="loading" id="loadingStatus">Получение информации о фильме...</div>
+    </div>
+  </div>
+
+  <!-- Noscript content for search engines -->
+  <noscript>
+    <h1>Filmotiv — Смотреть фильмы онлайн</h1>
+    <p>Бесплатный онлайн-сервис. Смотрите фильмы онлайн в хорошем качестве HD 1080, без рекламы и без регистрации.</p>
+    <p>Каталог включает: популярные фильмы, топ-250 лучших фильмов по версии Кинопоиска, новинки кино 2026 года.</p>
+    <p><a href="https://t.me/Filmotivbot">Открыть бота @Filmotivbot в Telegram</a></p>
+    <p><a href="https://filmotiv.vercel.app/">Открыть сайт Filmotiv</a></p>
+  </noscript>
+
+  <!-- Structured Data for SEO -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "VideoObject",
+    "name": "Фильм — Filmotiv",
+    "description": "Смотрите фильм онлайн бесплатно в хорошем качестве на Filmotiv",
+    "uploadDate": "2026-01-01",
+    "thumbnailUrl": "https://filmotiv.vercel.app/icon-512.png",
+    "contentUrl": "https://filmotiv.vercel.app/",
+    "embedUrl": "https://filmotiv.vercel.app/player.html"
+  }
+  </script>
+
+  <script>
+    // Extract film ID from URL (?id=251733 or /film/251733)
+    var params = new URLSearchParams(window.location.search);
+    var filmId = params.get('id');
+    if (!filmId) {
+      var pathParts = window.location.pathname.split('/');
+      filmId = pathParts[pathParts.length - 1];
+    }
+
+    function redirectToPlayer() {
+      try {
+        if (navigator.vibrate) navigator.vibrate([15, 40, 25]);
+        var COLORS = ['#8b5cf6', '#ec4899', '#38bdf8', '#34d399', '#facc15', '#fb923c'];
+        for (var i = 0; i < 40; i++) {
+          var el = document.createElement('div');
+          el.className = 'adhd-confetti';
+          el.style.left = (Math.random() * 100) + '%';
+          el.style.top = (Math.random() * 20) + '%';
+          el.style.background = COLORS[Math.floor(Math.random() * COLORS.length)];
+          el.style.setProperty('--x', String(Math.random()));
+          document.body.appendChild(el);
+          (function (node) { setTimeout(function () { node.remove(); }, 1500); })(el);
+        }
+      } catch (_) {}
+      if (filmId) {
+        window.location.href = '/player.html?id=' + encodeURIComponent(filmId);
+      } else {
+        window.location.href = '/';
+      }
+    }
+
+    // Fetch film details for SEO + display
+    if (filmId && /^\d+$/.test(filmId)) {
+      fetch('/api/kinopoisk?q=v2.2/films/' + encodeURIComponent(filmId))
+        .then(function(res) { return res.ok ? res.json() : null; })
+        .then(function(data) {
+          if (!data) { document.getElementById('loadingStatus').textContent = ''; return; }
+          var title = data.nameRu || data.nameEn || 'Фильм';
+          var year = data.year || '';
+          var rating = data.ratingKinopoisk || data.rating || '';
+          var desc = data.shortDescription || data.description || '';
+          var genres = (data.genres || []).slice(0, 3).map(function(g) { return g.genre; }).join(', ');
+          var length = data.filmLength || '';
+          if (length && !isNaN(Number(length))) {
+            var hrs = Math.floor(Number(length) / 60);
+            var mins = Number(length) % 60;
+            length = (hrs > 0 ? hrs + 'ч ' : '') + mins + 'м';
+          }
+
+          document.title = title + (year ? ' (' + year + ')' : '') + ' — Filmotiv';
+          document.getElementById('filmTitle').textContent = title + (year ? ' (' + year + ')' : '');
+
+          // Stats row
+          if (rating) document.getElementById('filmRating').textContent = '★ ' + rating;
+          if (year) document.getElementById('filmYear').textContent = year;
+          if (length) document.getElementById('filmLength').textContent = length;
+          // Poster
+          var posterUrl = data.posterUrl || data.posterUrlPreview || '';
+          if (posterUrl) {
+            var img = document.getElementById('filmPoster');
+            img.onload = function() { this.classList.add('loaded'); };
+            img.src = posterUrl;
+            img.alt = title;
+          }
+          // Description line (genres + text)
+          var descEl = document.getElementById('filmDesc');
+          if (genres) descEl.textContent = genres.charAt(0).toUpperCase() + genres.slice(1);
+          if (desc) {
+            var p = document.createElement('div');
+            p.style.marginTop = '8px';
+            p.textContent = desc.substring(0, 160) + (desc.length > 160 ? '…' : '');
+            descEl.appendChild(p);
+          }
+
+          // Update meta tags for SEO + social sharing (Open Graph)
+          document.querySelector('meta[name="description"]').setAttribute('content',
+            title + (year ? ' ' + year : '') + ' — смотреть онлайн бесплатно в хорошем качестве. ' + desc.substring(0, 120));
+          document.querySelector('meta[property="og:title"]').setAttribute('content', title + ' — Filmotiv');
+          document.querySelector('meta[property="og:description"]').setAttribute('content', desc.substring(0, 150));
+          // Use film poster as og:image (better social sharing preview than default icon)
+          if (posterUrl) {
+            document.querySelector('meta[property="og:image"]').setAttribute('content', posterUrl);
+            document.querySelector('meta[name="twitter:image"]').setAttribute('content', posterUrl);
+          }
+          // Update Twitter card title too
+          document.querySelector('meta[name="twitter:title"]').setAttribute('content', title + ' — Filmotiv');
+          document.querySelector('meta[name="twitter:description"]').setAttribute('content', desc.substring(0, 150) || 'Смотрите фильм онлайн бесплатно в хорошем качестве.');
+
+          document.getElementById('loadingStatus').textContent = '';
+
+          // Auto-redirect after 3s (let search engines index)
+          setTimeout(redirectToPlayer, 3000);
+        })
+        .catch(function() {
+          document.getElementById('loadingStatus').textContent = '';
+        });
+    } else {
+      document.getElementById('loadingStatus').textContent = '';
+    }
+  </script>
+</body>
+</html>

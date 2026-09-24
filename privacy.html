@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#000000">
+  <title>Политика конфиденциальности — Filmotiv</title>
+  <meta name="robots" content="index, follow">
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
+  <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: #08080d; color: #fff; line-height: 1.7;
+      padding: 20px; max-width: 800px; margin: 0 auto;
+    }
+    h1 { font-size: 28px; margin: 32px 0 16px; }
+    h2 { font-size: 20px; margin: 28px 0 12px; color: #c4b5fd; font-weight: 800; letter-spacing: -.01em; }
+    p { margin: 12px 0; color: rgba(255,255,255,0.85); font-size: 15px; }
+    ul { margin: 12px 0; padding-left: 24px; }
+    li { margin: 6px 0; color: rgba(255,255,255,0.85); font-size: 15px; }
+    code { background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-size: 14px; }
+    .header { text-align: center; padding: 40px 0 20px; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 32px; }
+    .header h1 { margin-top: 0; }
+    .updated { color: rgba(255,255,255,0.5); font-size: 13px; text-align: center; }
+    .back-link { display: inline-block; margin: 20px 0; padding: 10px 18px; background: rgba(139,92,246,0.12); border: 1px solid rgba(139,92,246,0.35); border-radius: 15px; color: #c4b5fd; text-decoration: none; font-size: 14px; font-weight: 700; }
+    .back-link:hover { text-decoration: underline; }
+    table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+    th, td { text-align: left; padding: 10px 12px; font-size: 14px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+    th { color: #a78bfa; font-weight: 600; }
+    td { color: rgba(255,255,255,0.85); }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Политика конфиденциальности</h1>
+    <p class="updated">Последнее обновление: 28 августа 2026 г.</p>
+  </div>
+
+  <a href="/" class="back-link">← Вернуться на главную</a>
+
+  <h2>1. Общие положения</h2>
+  <p>Настоящая Политика определяет порядок обработки данных пользователей сервиса Filmotiv (<code>filmotiv.vercel.app</code>, бот <code>@Filmotivbot</code>). Используя сервис, вы соглашаетесь с данной Политикой.</p>
+
+  <h2>2. Какие данные мы собираем</h2>
+  <table>
+    <tr><th>Данные</th><th>Назначение</th><th>Хранение</th></tr>
+    <tr><td>Telegram ID</td><td>Идентификация, синхронизация между устройствами</td><td>До удаления</td></tr>
+    <tr><td>Имя / username</td><td>Отображение в интерфейсе</td><td>До удаления</td></tr>
+    <tr><td>История просмотров</td><td>«Продолжить просмотр», «Мои фильмы»</td><td>90 дней</td></tr>
+    <tr><td>Избранное</td><td>«Коллекция»</td><td>До удаления</td></tr>
+    <tr><td>Позиция просмотра</td><td>Продолжить с места остановки</td><td>48 часов</td></tr>
+    <tr><td>IP-адрес</td><td>Модерация, защита от спама</td><td>До удаления</td></tr>
+    <tr><td>Тип устройства</td><td>Адаптация интерфейса</td><td>30 дней</td></tr>
+    <tr><td>Cookie сессии</td><td>Авторизация без повторного входа</td><td>30 дней</td></tr>
+  </table>
+
+  <h3>Мы НЕ собираем:</h3>
+  <ul>
+    <li>Полные строки User-Agent</li>
+    <li>Поисковые запросы</li>
+    <li>Геолокацию</li>
+    <li>Контактные данные (телефон, email)</li>
+    <li>Данные банковских карт</li>
+  </ul>
+
+  <h2>3. Куда передаются данные</h2>
+  <table>
+    <tr><th>Сервис</th><th>Данные</th><th>Цель</th></tr>
+    <tr><td>Supabase (ЕС/США)</td><td>Профиль, история, избранное</td><td>Хранение</td></tr>
+    <tr><td>Vercel (США)</td><td>IP (в логах)</td><td>Хостинг</td></tr>
+    <tr><td>Telegram API</td><td>Telegram ID, имя</td><td>Авторизация, бот</td></tr>
+    <tr><td>Kinopoisk API (РФ)</td><td>Не передаются</td><td>Каталог фильмов</td></tr>
+  </table>
+
+  <h2>4. Cookie</h2>
+  <ul>
+    <li><code>tg_session</code> — авторизация, 30 дней, HttpOnly</li>
+    <li><code>tg_oauth_state</code>, <code>tg_oauth_verifier</code> — CSRF-защита, 10 минут</li>
+  </ul>
+  <p>Мы НЕ используем рекламные или аналитические cookie.</p>
+
+  <h2>5. Ваши права</h2>
+  <ul>
+    <li><b>Доступ</b> — запросить копию ваших данных</li>
+    <li><b>Удаление</b> — команда <code>/clear</code> в боте</li>
+    <li><b>Отзыв согласия</b> — прекратить использование сервиса</li>
+  </ul>
+  <p>Для реализации этих прав напишите боту <code>@Filmotivbot</code>.</p>
+
+  <h2>6. Безопасность</h2>
+  <ul>
+    <li>Подписанные cookie (HMAC-SHA256)</li>
+    <li>HttpOnly cookie — недоступны из JavaScript</li>
+    <li>Верификация Telegram initData</li>
+    <li>CSRF-защита (state + PKCE)</li>
+    <li>HTTPS</li>
+  </ul>
+
+  <h2>7. Контакты</h2>
+  <p>Бот: <code>@Filmotivbot</code> · Канал: <code>@filmotiv_news</code></p>
+
+  <a href="/" class="back-link">← Вернуться на главную</a>
+</body>
+</html>

@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<!-- ====== DEBUG BUILD: vConsole + settings panel (auto-generated) ====== -->
+<style data-vconsole-override>
+/* Force vConsole above everything (including the player iframe) */
+#__vconsole { z-index: 2147483647 !important; }
+#__vconsole .vc-switch {
+  z-index: 2147483647 !important;
+  position: fixed !important;
+  right: 10px !important;
+  bottom: 10px !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  display: block !important;
+}
+#__vconsole .vc-mask, #__vconsole .vc-panel { z-index: 2147483647 !important; }
+#__vconsole .vc-content, #__vconsole .vc-plugin-content { -webkit-overflow-scrolling: touch; }
+#__vconsole .vc-item .vc-item-copy { display: block !important; opacity: 1 !important; visibility: visible !important; }
+#__vconsole .vc-toolbar .vc-tool { pointer-events: auto !important; }
+#__vconsole .vc-log .vc-item .vc-item-content { word-break: break-all; }
+/* "Copy all logs" button — injected into vConsole bottom toolbar (.vc-toolbar)
+   Styled as a native vc-tool so it sits next to the Clear button and never
+   overlaps the tabbar/Close (X) button at the top of the panel. */
+#__vconsole .vc-toolbar .vc-copy-all-btn {
+  flex: 1 !important;
+  display: block !important;
+  background: transparent !important;
+  color: inherit !important;
+  border: none !important;
+  font-size: 14px !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+  cursor: pointer !important;
+  line-height: 3em !important;
+  height: 3em !important;
+  -webkit-tap-highlight-color: transparent !important;
+  position: relative !important;
+  text-align: center !important;
+  padding: 0 1em !important;
+  transition: background 0.15s !important;
+  white-space: nowrap !important;
+}
+#__vconsole .vc-toolbar .vc-copy-all-btn:active { background: rgba(0, 0, 0, 0.15) !important; }
+#__vconsole .vc-toolbar .vc-copy-all-btn.copied {
+  background: #34C759 !important;
+  color: #fff !important;
+}
+/* Floating Copy button overlay — INDEPENDENT of vConsole internal DOM.
+   Positioned at the TOP of the vConsole panel (above the tabbar and content).
+   This avoids the Close (X) button at the bottom and the toolbar at the
+   very bottom. z-index is same as vConsole (max int) so it's always on top.
+   When user taps this button, it does NOT close the vConsole panel (it's
+   a separate element, not part of vConsole's DOM). */
+#vc-copy-overlay {
+  position: fixed;
+  top: 50px;  /* below the page header / safe area */
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2147483647;
+  background: rgba(0, 122, 255, 0.95);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 20px;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-weight: 700;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  display: none;  /* hidden by default — shown when vConsole panel is open */
+  transition: background 0.15s, transform 0.15s;
+  user-select: none;
+  -webkit-user-select: none;
+  white-space: nowrap;
+}
+#vc-copy-overlay.visible {
+  display: block;
+}
+#vc-copy-overlay:active {
+  background: rgba(0, 81, 213, 1);
+  transform: translateX(-50%) scale(0.96);
+}
+#vc-copy-overlay.copied {
+  background: #34C759;
+  border-color: #34C759;
+}
+/* Smaller on mobile */
+@media (max-width: 480px) {
+  #vc-copy-overlay {
+    top: 44px;
+    padding: 8px 16px;
+    font-size: 13px;
+  }
+}
+</style>
+
+<script src="/vendor/vconsole.min.js"></script>
+<script>
+console.log('[debug] vConsole lib loaded, VConsole type:', typeof window.VConsole);
+(function() {
+  // ----- Cross-page log persistence -----
+  if (!window.__logPersistenceSetup) {
+    window.__logPersistenceSetup = true;
+    var STORE_KEY = '__filmotiv_debug_logs';
+    var MAX_ENTRIES = 500;
+
+    var previousLogs = [];
+    try {
+      var raw = sessionStorage.getItem(STORE_KEY);
+      if (raw) previousLogs = JSON.parse(raw) || [];
+    } catch (_) {}
+
+    var currentLogs = [];
+    function persist() {
+      try { sessionStorage.setItem(STORE_KEY, JSON.stringify(currentLogs.slice(-MAX_ENTRIES))); } catch (_) {}
+    }
+
+    var origLog = console.log.bind(console);
+    var origWarn = console.warn.bind(console);
+    var origError = console.error.bind(console);
+    var origInfo = console.info.bind(console);
+
+    function record(level, args) {
+      try {
+        var msg = Array.prototype.map.call(args, function(a) {
+          if (typeof a === 'string') return a;
+          try { return JSON.stringify(a); } catch (_) { return String(a); }
+        }).join(' ');
+        currentLogs.push({ t: Date.now(), level: level, msg: msg });
+        if (currentLogs.length > MAX_ENTRIES) currentLogs.shift();
+        if (currentLogs.length % 5 === 0) persist();
+      } catch (_) {}
+    }
+
+    console.log = function() { record('log', arguments); origLog.apply(console, arguments); };
+    console.warn = function() { record('warn', arguments); origWarn.apply(console, arguments); };
+    console.error = function() { record('error', arguments); origError.apply(console, arguments); };
+    console.info = function() { record('info', arguments); origInfo.apply(console, arguments); };
+
+    window.addEventListener('pagehide', persist);
+    window.addEventListener('beforeunload', persist);
+    window.__getPreviousLogs = function() { return previousLogs; };
+
+    // Collect ALL logs (previous page + current page) as a single text block.
+    window.__getAllLogsText = function() {
+      var all = previousLogs.concat(currentLogs);
+      return all.map(function(entry) {
+        var time = new Date(entry.t).toLocaleTimeString('ru-RU', { hour12: false }) +
+                   '.' + String(entry.t % 1000).padStart(3, '0');
+        var level = (entry.level || 'log').toUpperCase().padEnd(5);
+        return '[' + time + '] [' + level + '] ' + entry.msg;
+      }).join('\n');
+    };
+  }
+
+  // ----- vConsole init -----
+  function initVConsoleSafe() {
+    try {
+      if (window.__vConsole) {
+        console.log('[debug] vConsole already inited');
+        return true;
+      }
+      if (typeof window.VConsole !== 'function') {
+        console.warn('[debug] VConsole not yet defined (typeof=' + typeof window.VConsole + ')');
+        return false;
+      }
+      console.log('[debug] Initializing vConsole...');
+      window.__vConsole = new window.VConsole({
+        defaultPlugins: ['system','network','element','storage']
+      });
+      console.log('[debug] vConsole ready at', (performance.now() / 1000).toFixed(2) + 's');
+
+      var vc = document.getElementById('__vconsole');
+      console.log('[debug] #__vconsole element:', vc ? 'found' : 'NOT FOUND');
+
+      // Re-parent to <body> and force LAST position (paints on top of iframe)
+      if (vc) {
+        if (vc.parentNode !== document.body) document.body.appendChild(vc);
+        if (document.body.lastChild !== vc) document.body.appendChild(vc);
+      }
+      // MutationObserver: keep #__vconsole last in <body>
+      if (window.MutationObserver && vc) {
+        var savedVc = vc;
+        new MutationObserver(function() {
+          if (!document.body) return;
+          var current = document.getElementById('__vconsole');
+          if (!current) document.body.appendChild(savedVc);
+          else if (document.body.lastChild !== current) document.body.appendChild(current);
+        }).observe(document.body, { childList: true, subtree: false });
+      }
+
+      // Replay previous page logs
+      if (window.__getPreviousLogs) {
+        var prev = window.__getPreviousLogs();
+        if (prev && prev.length > 0) {
+          console.log('--- --- --- --- --- --- --- --- --- --- ---');
+          console.log('[prev] Logs from previous page (' + prev.length + '):');
+          prev.forEach(function(entry) {
+            var prefix = '[prev ' + new Date(entry.t).toLocaleTimeString() + '] ';
+            var msg = prefix + entry.msg;
+            if (entry.level === 'error') console.error(msg);
+            else if (entry.level === 'warn') console.warn(msg);
+            else if (entry.level === 'info') console.info(msg);
+            else console.log(msg);
+          });
+          console.log('--- --- --- --- --- --- --- --- --- --- ---');
+        }
+      }
+
+      // "Copy all logs" button — INDEPENDENT overlay (NOT injected into vConsole DOM).
+      // We create our own fixed-position button outside #__vconsole, and toggle
+      // its visibility based on whether the vConsole panel is open.
+      // Approach:
+      //   1. Create button #vc-copy-overlay, append to <body> (deferred to
+      //      DOMContentLoaded if body is not yet available — script may
+      //      run in <head>).
+      //   2. Watch .vc-panel display state via polling (cheap, every 300ms).
+      //   3. When .vc-panel becomes visible (display !== 'none'), show overlay.
+      //   4. When user clicks overlay, copy __getAllLogsText() to clipboard.
+      // This bypasses all vConsole internal DOM/Svelte quirks — works on every
+      // platform (PC, mobile, app) since it's just a sibling DOM element.
+      function fallbackCopy(text, btn) {
+        try {
+          var ta = document.createElement('textarea');
+          ta.value = text;
+          ta.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;opacity:0;';
+          document.body.appendChild(ta);
+          ta.focus();
+          ta.select();
+          var ok = document.execCommand('copy');
+          document.body.removeChild(ta);
+          if (ok) {
+            btn.classList.add('copied');
+            btn.textContent = '✅ Copied (' + text.split('\n').length + ' lines)';
+            setTimeout(function() {
+              btn.classList.remove('copied');
+              btn.textContent = '📋 Copy logs';
+            }, 2000);
+          } else {
+            btn.textContent = '❌ execCommand failed';
+            setTimeout(function() { btn.textContent = '📋 Copy logs'; }, 1500);
+          }
+        } catch (e) {
+          btn.textContent = '❌ ' + e.message;
+          setTimeout(function() { btn.textContent = '📋 Copy logs'; }, 1500);
+        }
+      }
+
+      function setupCopyOverlay(copyOverlay) {
+        copyOverlay.addEventListener('click', function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          try {
+            var text = window.__getAllLogsText ? window.__getAllLogsText() : '';
+            if (!text) {
+              copyOverlay.textContent = 'No logs';
+              setTimeout(function() { copyOverlay.textContent = '📋 Copy logs'; }, 1500);
+              return;
+            }
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+              navigator.clipboard.writeText(text).then(function() {
+                copyOverlay.classList.add('copied');
+                copyOverlay.textContent = '✅ Copied (' + text.split('\n').length + ' lines)';
+                setTimeout(function() {
+                  copyOverlay.classList.remove('copied');
+                  copyOverlay.textContent = '📋 Copy logs';
+                }, 2000);
+              }).catch(function() { fallbackCopy(text, copyOverlay); });
+            } else {
+              fallbackCopy(text, copyOverlay);
+            }
+          } catch (err) {
+            copyOverlay.textContent = '❌ Error';
+            setTimeout(function() { copyOverlay.textContent = '📋 Copy logs'; }, 1500);
+            console.error('[debug] Copy logs failed:', err);
+          }
+        });
+
+        // Toggle overlay visibility based on .vc-panel state. vConsole uses
+        // 'display:block' on .vc-panel when open, 'display:none' when closed.
+        // Polling every 300ms is cheap (1 querySelector) and reliable.
+        // KEY FIX: Move the copy button INSIDE #__vconsole element (not body).
+        // This puts it in the same stacking context as vConsole, so it's
+        // rendered ON TOP of the .vc-mask (which covers the full screen and
+        // would otherwise intercept taps meant for our button).
+        setInterval(function() {
+          var vc = document.getElementById('__vconsole');
+          var panel = vc ? vc.querySelector('.vc-panel') : null;
+          if (!panel) {
+            copyOverlay.classList.remove('visible');
+            return;
+          }
+          var isOpen = window.getComputedStyle(panel).display !== 'none';
+          if (isOpen) {
+            copyOverlay.classList.add('visible');
+            // Move button INSIDE #__vconsole (as last child) so it's on top
+            // of the mask and panel in the same stacking context.
+            if (vc && copyOverlay.parentNode !== vc) {
+              vc.appendChild(copyOverlay);
+            }
+            // Also ensure it's the last child of #__vconsole.
+            if (vc && vc.lastChild !== copyOverlay) {
+              vc.appendChild(copyOverlay);
+            }
+          } else {
+            copyOverlay.classList.remove('visible');
+          }
+        }, 300);
+      }
+
+      function createCopyOverlay() {
+        if (document.getElementById('vc-copy-overlay')) return; // already created
+        var copyOverlay = document.createElement('button');
+        copyOverlay.id = 'vc-copy-overlay';
+        copyOverlay.type = 'button';
+        copyOverlay.textContent = '📋 Copy logs';
+        copyOverlay.setAttribute('aria-label', 'Copy all logs to clipboard');
+        // Append to body — but ensure it's the LAST child so it renders
+        // above vConsole (same z-index, but later in DOM = on top).
+        document.body.appendChild(copyOverlay);
+        // Re-append to force it to be last (in case vConsole was added after).
+        document.body.appendChild(copyOverlay);
+        setupCopyOverlay(copyOverlay);
+        console.log('[debug] Copy-logs overlay initialized (independent of vConsole DOM)');
+      }
+
+      // Defer creation until <body> is available (script may run in <head>).
+      if (document.body) {
+        createCopyOverlay();
+      } else {
+        document.addEventListener('DOMContentLoaded', createCopyOverlay);
+      }
+
+      return true;
+    } catch (e) {
+      console.warn('[debug] vConsole init failed', e);
+      return true;
+    }
+  }
+
+  // Retry loop — vconsole.min.js loads synchronously but we keep retry as safety
+  (function tryInit(retries) {
+    if (initVConsoleSafe()) return;
+    if (retries > 0) setTimeout(function() { tryInit(retries - 1); }, 50);
+    else console.warn('[debug] vConsole failed after retries');
+  })(20);
+
+  // ----- Listen for logs from iframe (player) -----
+  window.addEventListener('message', function(e) {
+    if (!e.data) return;
+    var d = e.data;
+    if (typeof d === 'string') {
+      try { d = JSON.parse(d); } catch (_) { return; }
+    }
+    if (!d || typeof d !== 'object') return;
+    if (d.type === 'iframe_log' && d.level && d.msg) {
+      var prefix = '[iframe] ';
+      if (d.level === 'error') console.error(prefix + d.msg);
+      else if (d.level === 'warn') console.warn(prefix + d.msg);
+      else if (d.level === 'info') console.info(prefix + d.msg);
+      else console.log(prefix + d.msg);
+    }
+  });
+})();
+</script>
+
+</script>
+
+
+<!-- ====== END vConsole injection ====== -->
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, maximum-scale=1, minimum-scale=1">
+  <meta name="theme-color" content="#000000">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Filmotiv">
+
+  <!-- SEO Meta Tags -->
+  <title>[DEBUG] Filmotiv</title>
+  <meta name="description" content="Filmotiv. Смотрите фильмы онлайн в хорошем качестве. Каталог лучших фильмов: популярные, топ-250, новинки. Поиск фильмов, рейтинги, отзывы. Без рекламы.">
+  <meta name="keywords" content="фильмотив, filmotiv, смотреть фильмы онлайн, смотреть кино онлайн, кино бесплатно, фильмы бесплатно, кино онлайн бесплатно, фильмы в хорошем качестве, смотреть фильмы в хорошем качестве, HD фильмы, фильмы HD 1080, фильмы 4K, новые фильмы 2026, новинки кино 2026, популярные фильмы, топ фильмов, топ 250 фильмов, лучшие фильмы, поиск фильмов, найти фильм, кинопоиск, рейтинг фильмов, фильмы без рекламы, фильмы без регистрации, фильмы в телеграм, кино в телеграм, telegram фильмы, фильмы онлайн без рекламы, смотреть фильмы без VPN, бесплатные фильмы, кино онлайн HD, фильмы в хорошем качестве бесплатно, фильмы драма, фильмы комедия, фильмы триллер, фильмы фантастика, фильмы боевик, русские фильмы, зарубежные фильмы, советские фильмы, артхаус, короткометражки, документальные фильмы, мультфильмы онлайн, аниме онлайн, сериалы онлайн, кино для всей семьи, вечерний фильм, что посмотреть, фильм на вечер, каталог фильмов, база фильмов, трейлеры фильмов, описания фильмов, отзывы о фильмах, оценки фильмов, звёзды фильмов, актёры, режиссёры, премьеры, прокат, стриминг, онлайн кинотеатр, бесплатный кинотеатр, кинотеатр в кармане, кино на телефоне, фильмы на телефоне, фильмы на айфоне, фильмы на андроид, фильмы на компьютере, фильмы на телевизоре, фильмы на проекторе, smart tv фильмы, тв бокс фильмы, медиаплеер, фильмопоиск, filmotiv bot, filmotivbot, фильмотив бот, @filmotivbot">
+  <meta name="author" content="Filmotiv">
+  <meta name="robots" content="noindex, nofollow, nosnippet">
+  <meta name="language" content="Russian">
+  <meta name="revisit-after" content="1 day">
+
+  <!-- Search Engine Verification -->
+  <meta name="yandex-verification" content="317d9c9354b69802" />
+  <meta name="google-site-verification" content="Yd6LYUl97HtqaAmwgFf7BJIauzpoOLVc1epesFXZ890" />
+
+  <!-- Open Graph / Social Media -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Filmotiv — Смотреть фильмы онлайн бесплатно">
+  <meta property="og:description" content="Filmotiv. Каталог лучших фильмов: популярные, топ-250, новинки. Поиск фильмов, рейтинги. Без рекламы.">
+  <meta property="og:url" content="https://filmotiv.vercel.app/">
+  <meta property="og:image" content="https://filmotiv.vercel.app/icon-512.png">
+  <meta property="og:site_name" content="Filmotiv">
+  <meta property="og:locale" content="ru_RU">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Filmotiv — Смотреть фильмы онлайн">
+  <meta name="twitter:description" content="Filmotiv. Каталог лучших фильмов, рейтинги, поиск.">
+  <meta name="twitter:image" content="https://filmotiv.vercel.app/icon-512.png">
+
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/icon-192.png">
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
+  <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
+  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico">
+  <link rel="preconnect" href="https://filmotiv.vercel.app">
+  <link rel="dns-prefetch" href="https://filmotiv.vercel.app">
+  <link rel="canonical" href="https://filmotiv.vercel.app/">
+  <script src="/i18n.js"></script>
+  <!-- Vercel Web Analytics (vanilla HTML CDN approach per Vercel docs) -->
+  <script defer src="https://cdn.vercel-insights.com/v1/script.js"></script>
+  <script defer src="/js/error-handler.js?v=160"></script>
+  <script async src="https://telegram.org/js/telegram-web-app.js" onerror="console.log('[tg] telegram-web-app.js unavailable (running outside Telegram Mini App — this is normal)')"></script>
+  <link rel="stylesheet" href="/css/app.css?v=160">
+  <script>try{fetch("/api/poster?id=251733&size=small").catch(function(){});fetch("/api/kinopoisk?q=v2.2/films/top&type=TOP_250_BEST_FILMS&page=1").catch(function(){});fetch("/api/kinopoisk?q=v2.2/films&order=NUM_VOTE&type=FILM&ratingFrom=7&ratingTo=10&yearFrom=2020&yearTo=2025&page=1").catch(function(){});}catch(e){}</script>
+  <!-- Structured Data for Search Engines (JSON-LD) -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "Filmotiv",
+    "alternateName": "Фильмотив",
+    "url": "https://filmotiv.vercel.app/",
+    "description": "Filmotiv. Смотрите фильмы онлайн в хорошем качестве. Каталог лучших фильмов: популярные, топ-250, новинки.",
+    "potentialAction": {
+      "@type": "SearchAction",
+      "target": "https://filmotiv.vercel.app/?q={search_term_string}",
+      "query-input": "required name=search_term_string"
+    }
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "Filmotiv",
+    "url": "https://filmotiv.vercel.app/",
+    "logo": "https://filmotiv.vercel.app/icon-512.png",
+    "sameAs": ["https://t.me/Filmotivbot"]
+  }
+  </script>
+</head>
+<body>
+  <!-- Noscript content for search engine crawlers -->
+  <noscript>
+    <h1>Filmotiv — Смотреть фильмы онлайн бесплатно в хорошем качестве</h1>
+    <p>Filmotiv (Фильмотив) — бесплатный онлайн-сервис. Смотрите кино онлайн бесплатно, фильмы в хорошем качестве HD 1080, без рекламы и без регистрации.</p>
+
+    <h2>Смотреть фильмы онлайн</h2>
+    <p>На Filmotiv вы можете смотреть фильмы онлайн бесплатно в хорошем качестве. Каталог включает: популярные фильмы, топ-250 лучших фильмов по версии Кинопоиска, новинки кино 2026 года, случайный фильм на вечер.</p>
+
+    <h2>Категории фильмов</h2>
+    <ul>
+      <li>Популярные фильмы — самые просматриваемые фильмы прямо сейчас</li>
+      <li>Топ 250 — лучшие фильмы всех времён по рейтингу Кинопоиска</li>
+      <li>Новинки — новые фильмы 2026 года</li>
+      <li>Случайный фильм — не знаете что посмотреть? Выберем за вас!</li>
+      <li>Коллекция — ваши любимые фильмы в одном месте</li>
+    </ul>
+
+    <h2>Жанры фильмов</h2>
+    <p>Драма, комедия, триллер, фантастика, боевик, ужасы, детектив, приключения, мелодрама, исторический, военный, криминал, биография, спорт, мюзикл, вестерн, артхаус, короткометражки, документальные фильмы, мультфильмы, аниме, сериалы.</p>
+
+    <h2>Популярные фильмы на Filmotiv</h2>
+    <p>Интерстеллар, Побег из Шоушенка, Зелёная миля, Крёстный отец, Тёмный рыцарь, Начало, Гладиатор, Аватар, Властелин колец, Звёздные войны, Матрица, Титаник, Форрест Гамп, Леон, Бойцовский клуб, Молчание ягнят, Пианист, Жизнь прекрасна, Список Шиндлера, Хорошо быть тихоней.</p>
+
+    <h2>Русские и зарубежные фильмы</h2>
+    <p>Смотрите русские фильмы, советские фильмы, зарубежные фильмы, европейское кино, азиатское кино, американские фильмы, британские фильмы. Фильмы с субтитрами и в оригинале.</p>
+
+    <h2>Фильмы на любом устройстве</h2>
+    <p>Смотрите фильмы на телефоне, фильмы на айфоне, фильмы на андроид, фильмы на компьютере, фильмы на телевизоре Smart TV, фильмы на проекторе. Приложение работает в Telegram Mini App — открывается одним нажатием.</p>
+
+    <h2>Поиск фильмов</h2>
+    <p>Введите @Filmotivbot и название фильма в любом чате Telegram для быстрого поиска. Рейтинг Кинопоиска, жанры, описания, постеры — всё в одном сообщении.</p>
+
+    <h2>Бесплатные фильмы без рекламы</h2>
+    <p>Filmotiv — это бесплатные фильмы онлайн без рекламы. Смотрите кино в хорошем качестве бесплатно. Фильмы HD 1080. Стриминг фильмов без VPN. Фильмы в любом месте.</p>
+
+    <p><a href="https://t.me/Filmotivbot">Открыть бота @Filmotivbot в Telegram</a></p>
+    <p><a href="https://filmotiv.vercel.app/">Открыть сайт Filmotiv</a></p>
+  </noscript>
+  <div class="container">
+  <div class="hero">
+      <div class="hero-click-catcher" id="heroClickCatcher"></div>
+      <button class="hero-scroll-top" id="heroScrollTop" type="button" aria-label="Наверх" title="Наверх">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 4 L4 14 L9 14 L9 20 L15 20 L15 14 L20 14 Z"/></svg>
+      </button>
+      <h1 class="hero-title" id="heroTitle"><span id="premiumBadge" class="premium-badge" style="display:none;">🔥</span>Filmotiv</h1>
+      <p class="hero-subtitle" id="heroSubtitle" style="display:none;"></p>
+    </div>
+    <div class="resume-card" id="resumeCard">
+      <img class="resume-poster" id="resumePoster" src="" alt="" style="width:48px;height:68px;border-radius:8px;object-fit:cover;flex-shrink:0;background:var(--bg-tertiary);display:none;">
+      <div class="resume-info">
+        <div class="resume-label">Продолжить просмотр</div>
+        <div class="resume-title" id="resumeTitle">—</div>
+        <div class="resume-meta" id="resumeMeta">—</div>
+      </div>
+      <button class="resume-close" id="resumeClose" title="Скрыть">✕</button>
+    </div>
+    <div class="search-wrapper">
+      <div class="search-container">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="searchInput" class="search-input" placeholder="Поиск фильмов..." autocomplete="off" enterkeyhint="done" inputmode="search" />
+        <button class="search-clear" id="searchClear" type="button" title="Очистить">✕</button>
+      </div>
+    </div>
+    <div class="actions">
+      <div class="action-card" data-cat="popular" tabindex="0">
+        <span class="action-icon">🔥</span>
+        <div class="action-title">Популярные</div>
+      </div>
+      <div class="action-card" data-cat="top250" tabindex="0">
+        <span class="action-icon">⭐</span>
+        <div class="action-title">Топ 250</div>
+      </div>
+      <div class="action-card" data-cat="new" tabindex="0">
+        <span class="action-icon">🎬</span>
+        <div class="action-title">Новинки</div>
+      </div>
+      <div class="action-card" data-cat="random" tabindex="0">
+        <span class="action-icon">🎯</span>
+        <div class="action-title">Случайный</div>
+      </div>
+      <div class="action-card" data-cat="favorites" tabindex="0">
+        <span class="action-icon">❤️</span>
+        <div class="action-title">Коллекция</div>
+      </div>
+    </div>
+    <div class="content hidden" id="content">
+      <div class="loader" id="loader">
+        <div class="fx-cube-loader">
+          <span></span><span></span><span></span><span></span>
+        </div>
+        <div class="loader-text">Загрузка...</div>
+      </div>
+      <div class="film-grid" id="filmGrid"></div>
+    </div>
+    </div>
+  </div>
+  <!-- Scroll-to-top floating button (appears when user scrolls down the film list) -->
+  <button id="scrollTopBtn" type="button" aria-label="Наверх" title="Наверх"></button>
+  <style>
+  #scrollTopBtn {
+    position: fixed; bottom: 80px; right: 16px; z-index: 997;
+    width: 52px; height: 52px; border-radius: 50%;
+    background: rgba(0, 122, 255, 0.95); color: #fff; border: none;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; padding: 0; line-height: 1;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+    -webkit-tap-highlight-color: transparent;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    touch-action: manipulation;
+    -webkit-user-select: none; user-select: none;
+    opacity: 0; visibility: hidden; pointer-events: none;
+    transform: translateY(10px) scale(0.9);
+    transition: opacity 0.25s ease, transform 0.25s ease, visibility 0.25s, background 0.15s;
+  }
+  #scrollTopBtn.visible {
+    opacity: 1; visibility: visible; pointer-events: auto;
+    transform: translateY(0) scale(1);
+  }
+  #scrollTopBtn:active {
+    background: rgba(0, 122, 255, 1);
+    transform: scale(0.92);
+  }
+  #scrollTopBtn::before {
+    content: "";
+    display: block;
+    width: 22px; height: 22px;
+    background: currentColor;
+    -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M12 4 L4 14 L9 14 L9 20 L15 20 L15 14 L20 14 Z' fill='black'/></svg>") center center / contain no-repeat;
+    mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M12 4 L4 14 L9 14 L9 20 L15 20 L15 14 L20 14 Z' fill='black'/></svg>") center center / contain no-repeat;
+  }
+  @media (max-width: 480px) {
+    #scrollTopBtn {
+      bottom: 76px; right: 12px;
+      width: 46px; height: 46px;
+    }
+    #scrollTopBtn::before { width: 20px; height: 20px; }
+  }
+  </style>
+  <script>
+  (function() {
+    var btn = document.getElementById('scrollTopBtn');
+    if (!btn) return;
+    var SHOW_THRESHOLD = 600;
+    var rafPending = false;
+    function updateVisibility() {
+      rafPending = false;
+      var y = window.pageYOffset || document.documentElement.scrollTop || 0;
+      if (y > SHOW_THRESHOLD) btn.classList.add('visible');
+      else btn.classList.remove('visible');
+    }
+    window.addEventListener('scroll', function() {
+      if (rafPending) return;
+      rafPending = true;
+      if (window.requestAnimationFrame) requestAnimationFrame(updateVisibility);
+      else setTimeout(updateVisibility, 16);
+    }, { passive: true });
+    function scrollToTop(e) {
+      if (e && e.preventDefault) e.preventDefault();
+      if (e && e.stopPropagation) e.stopPropagation();
+      try { window.scrollTo({ top: 0, behavior: 'smooth' }); }
+      catch (err) { window.scrollTo(0, 0); }
+    }
+    if (window.PointerEvent) {
+      btn.addEventListener('pointerdown', scrollToTop);
+    } else {
+      btn.addEventListener('touchstart', function(e) { e.preventDefault(); scrollToTop(e); }, { passive: false });
+      btn.addEventListener('click', scrollToTop);
+    }
+    updateVisibility();
+  })();
+  </script>
+  <!-- Fixed "Open in Telegram" button — always visible at bottom on scroll -->
+  <a href="https://t.me/Filmotivbot?start=app" target="_blank" rel="noopener" id="fixedTelegramBtn" style="position:fixed;bottom:0;left:0;right:0;z-index:999;background:linear-gradient(135deg,#229ED9 0%,#2AABEE 100%);color:#fff;text-align:center;padding:14px 20px;text-decoration:none;font-size:16px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 -4px 20px rgba(0,0,0,0.4);transition:transform 0.3s,opacity 0.3s;padding-bottom: calc(env(safe-area-inset-bottom) + 14px);">
+    <span id="fixedTelegramText">Открыть Telegram</span>
+  </a>
+  <!-- Long-press film info popup (mobile only — desktop uses :hover) -->
+  <div class="film-info-overlay" id="filmInfoOverlay">
+    <div class="film-info-popup" id="filmInfoPopup">
+      <img class="fip-poster" id="fipPoster" src="" alt="">
+      <div class="fip-title" id="fipTitle"></div>
+      <div class="fip-meta" id="fipMeta"></div>
+      <div class="fip-actions">
+        <button class="fip-btn fip-btn-secondary" id="fipClose" data-i18n="filmInfoClose">Закрыть</button>
+        <button class="fip-btn fip-btn-primary" id="fipOpen" data-i18n="filmInfoWatch">▶ Смотреть</button>
+      </div>
+    </div>
+  </div>
+  <script defer src="/js/app.js?v=160"></script>
+
+<script>
+// ====== Debug settings panel (gear button + FX effects) ======
+(function() {
+  if (window.__debugSettingsLoaded) return;
+  window.__debugSettingsLoaded = true;
+
+  console.log('[debug-effects] Activating debug effects & settings panel');
+
+  var effectStyle = document.createElement('style');
+  effectStyle.textContent = `
+    /* === FX 1: Cube loader === */
+    body.fx-on .fx-cube-loader { transform: scale(1.3); }
+
+    /* === FX 2: Rainbow title === */
+    body.fx-on .hero-title {
+      background: linear-gradient(90deg, #ff0000, #ff8800, #ffff00, #00ff00, #00ffff, #0088ff, #8800ff, #ff00ff, #ff0000) !important;
+      background-size: 400% 100% !important;
+      -webkit-background-clip: text !important;
+      -webkit-text-fill-color: transparent !important;
+      background-clip: text !important;
+      animation: fx-rainbow 4s linear infinite !important;
+    }
+    @keyframes fx-rainbow {
+      0% { background-position: 0% 50%; }
+      100% { background-position: 400% 50%; }
+    }
+
+    /* === FX 3: Holo cards === */
+    body.fx-on .action-card {
+      position: relative;
+      transform-style: preserve-3d;
+      transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) !important;
+    }
+    body.fx-on .action-card::before {
+      content: "";
+      position: absolute;
+      inset: -2px;
+      border-radius: 21px;
+      background: linear-gradient(135deg,
+        rgba(168,85,247,0.4),
+        rgba(59,130,246,0.3),
+        rgba(16,185,129,0.2),
+        rgba(245,158,11,0.1)
+      );
+      filter: blur(20px);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      z-index: -1;
+    }
+    body.fx-on .action-card::after {
+      content: "";
+      position: absolute;
+      inset: 1px;
+      border-radius: 19px;
+      background: linear-gradient(135deg, rgba(255,255,255,0.08), rgba(0,0,0,0.3));
+      z-index: 0;
+      pointer-events: none;
+    }
+    body.fx-on .action-card:hover::before { opacity: 0.7; }
+    body.fx-on .action-card:hover {
+      transform: rotateX(15deg) rotateY(-15deg) translateY(-4px) !important;
+      box-shadow: 0 18px 40px -10px rgba(168,85,247,0.5) !important;
+    }
+    body.fx-on .action-card > * { position: relative; z-index: 1; }
+
+    /* === FX 4: Film card hover zoom + caption slide === */
+    body.fx-on .film-card {
+      overflow: hidden;
+      border-radius: 14px;
+      box-shadow: 0 14px 30px -10px rgba(0,0,0,0.4);
+    }
+    body.fx-on .film-card:hover {
+      transform: translateY(-6px) !important;
+      box-shadow: 0 20px 50px -10px rgba(0,122,255,0.5) !important;
+    }
+    body.fx-on .film-poster {
+      transition: transform 0.7s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.3s ease !important;
+    }
+    body.fx-on .film-card:hover .film-poster {
+      transform: scale(1.12);
+    }
+    body.fx-on .film-info {
+      position: absolute !important;
+      left: 0; right: 0; bottom: 0;
+      padding: 16px !important;
+      background: linear-gradient(transparent, rgba(0,0,0,0.85)) !important;
+      transform: translateY(100%);
+      transition: transform 0.4s ease !important;
+      z-index: 2;
+    }
+    body.fx-on .film-card:hover .film-info {
+      transform: translateY(0);
+    }
+    body.fx-on .film-title {
+      font-size: 16px !important;
+      font-weight: 700 !important;
+    }
+    body.fx-on .film-meta span { font-size: 12px; opacity: 0.85; }
+
+    /* Settings gear button */
+    #debugSettingsBtn {
+      position: fixed; top: 12px; right: 12px; z-index: 1500;
+      width: 40px; height: 40px; border-radius: 50%;
+      background: var(--bg-secondary); border: 1px solid var(--separator);
+      color: var(--text-primary); font-size: 20px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+      transition: transform 0.3s, background 0.2s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #debugSettingsBtn:hover { transform: rotate(45deg); background: var(--bg-tertiary); }
+    #debugSettingsBtn:active { transform: rotate(45deg) scale(0.9); }
+
+    /* Settings panel */
+    #debugSettingsPanel {
+      position: fixed; top: 60px; right: 12px; z-index: 1500;
+      background: var(--bg-secondary); border: 1px solid var(--separator);
+      border-radius: 16px; padding: 16px; min-width: 260px;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+      display: none; font-family: inherit;
+      max-height: 80vh; overflow-y: auto;
+    }
+    #debugSettingsPanel.visible { display: block; animation: fx-slide-down 0.2s ease-out; }
+    @keyframes fx-slide-down { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+    .ds-title { font-size: 15px; font-weight: 700; color: var(--text-primary); margin-bottom: 12px; }
+    .ds-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--separator); }
+    .ds-row:last-child { border-bottom: none; }
+    .ds-label { font-size: 13px; color: var(--text-primary); }
+    .ds-value { font-size: 13px; font-weight: 600; color: var(--ios-blue); min-width: 50px; text-align: right; }
+    .ds-slider { width: 100px; -webkit-appearance: none; appearance: none; height: 4px; border-radius: 2px; background: var(--separator); outline: none; }
+    .ds-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; border-radius: 50%; background: var(--ios-blue); cursor: pointer; }
+    .ds-slider::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: var(--ios-blue); cursor: pointer; border: none; }
+    .ds-toggle { width: 44px; height: 24px; border-radius: 12px; background: var(--separator); position: relative; cursor: pointer; transition: background 0.2s; border: none; padding: 0; }
+    .ds-toggle.on { background: var(--ios-blue); }
+    .ds-toggle::after { content: ''; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: transform 0.2s; }
+    .ds-toggle.on::after { transform: translateX(20px); }
+    .ds-btn { width: 100%; padding: 8px; border-radius: 10px; border: 1px solid var(--separator); background: var(--bg-tertiary); color: var(--text-primary); font-size: 13px; cursor: pointer; margin-top: 8px; font-family: inherit; }
+    .ds-btn:active { transform: scale(0.96); }
+  `;
+  document.head.appendChild(effectStyle);
+
+  // --- Settings gear button ---
+  var gearBtn = document.createElement('button');
+  gearBtn.id = 'debugSettingsBtn';
+  gearBtn.textContent = '⚙️';
+  gearBtn.title = 'Debug settings';
+  document.body.appendChild(gearBtn);
+
+  // --- Settings panel ---
+  var panel = document.createElement('div');
+  panel.id = 'debugSettingsPanel';
+  panel.innerHTML = `
+    <div class="ds-title">⚙️ Debug settings</div>
+    <div class="ds-row">
+      <span class="ds-label">🧊 Cube loader</span>
+      <button class="ds-toggle" id="dsFx1Toggle"></button>
+    </div>
+    <div class="ds-row">
+      <span class="ds-label">🌈 Rainbow title</span>
+      <button class="ds-toggle" id="dsFx2Toggle"></button>
+    </div>
+    <div class="ds-row">
+      <span class="ds-label">💎 Holo cards</span>
+      <button class="ds-toggle" id="dsFx3Toggle"></button>
+    </div>
+    <div class="ds-row">
+      <span class="ds-label">🔍 Film zoom</span>
+      <button class="ds-toggle" id="dsFx4Toggle"></button>
+    </div>
+    <div class="ds-row">
+      <span class="ds-label">Zoom</span>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <input type="range" class="ds-slider" id="dsZoomSlider" min="50" max="150" value="100" step="5">
+        <span class="ds-value" id="dsZoomValue">100%</span>
+      </div>
+    </div>
+    <div class="ds-row">
+      <span class="ds-label">Theme</span>
+      <button class="ds-btn" id="dsThemeBtn" style="width:auto;padding:6px 12px;margin:0;">🎨 Cycle</button>
+    </div>
+    <div class="ds-row">
+      <span class="ds-label">🌐 Language</span>
+      <button class="ds-btn" id="dsLangBtn" style="width:auto;padding:6px 12px;margin:0;">RU</button>
+    </div>
+    <button class="ds-btn" id="dsResetBtn">Reset settings</button>
+  `;
+  document.body.appendChild(panel);
+
+  // Toggle panel visibility
+  gearBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    panel.classList.toggle('visible');
+  });
+  // Close panel on outside click
+  document.addEventListener('click', function(e) {
+    if (!panel.contains(e.target) && e.target !== gearBtn) {
+      panel.classList.remove('visible');
+    }
+  });
+
+  // --- FX effects ---
+  function applyFx1(on) { document.body.classList.toggle('fx-on', on); var t = document.getElementById('dsFx1Toggle'); if (t) t.classList.toggle('on', on); }
+  function applyFx2(on) { document.body.classList.toggle('fx-on', on); var t = document.getElementById('dsFx2Toggle'); if (t) t.classList.toggle('on', on); }
+  function applyFx3(on) { document.body.classList.toggle('fx-on', on); var t = document.getElementById('dsFx3Toggle'); if (t) t.classList.toggle('on', on); }
+  function applyFx4(on) { document.body.classList.toggle('fx-on', on); var t = document.getElementById('dsFx4Toggle'); if (t) t.classList.toggle('on', on); }
+
+  function applyZoom(z) {
+    document.documentElement.style.setProperty('--debug-zoom', (z / 100));
+    document.body.style.zoom = (z / 100);
+    var v = document.getElementById('dsZoomValue');
+    if (v) v.textContent = z + '%';
+  }
+
+  function applyLang(lang) {
+    window.__filmotivLang = lang;
+    var btn = document.getElementById('dsLangBtn');
+    if (btn) btn.textContent = lang.toUpperCase();
+    if (typeof window.setLang === 'function') window.setLang(lang);
+  }
+
+  // Load saved settings
+  var savedZoom = localStorage.getItem('debug_zoom') || '100';
+  var savedFx1 = localStorage.getItem('debug_fx1') === 'on';
+  var savedFx2 = localStorage.getItem('debug_fx2') === 'on';
+  var savedFx3 = localStorage.getItem('debug_fx3') === 'on';
+  var savedFx4 = localStorage.getItem('debug_fx4') === 'on';
+  var savedLang = localStorage.getItem('debug_lang') || 'ru';
+
+  applyZoom(parseInt(savedZoom, 10) || 100);
+  applyFx1(savedFx1); applyFx2(savedFx2); applyFx3(savedFx3); applyFx4(savedFx4);
+  applyLang(savedLang);
+
+  // Wire up toggles
+  document.getElementById('dsFx1Toggle').addEventListener('click', function() {
+    var on = !this.classList.contains('on'); applyFx1(on);
+    localStorage.setItem('debug_fx1', on ? 'on' : 'off');
+  });
+  document.getElementById('dsFx2Toggle').addEventListener('click', function() {
+    var on = !this.classList.contains('on'); applyFx2(on);
+    localStorage.setItem('debug_fx2', on ? 'on' : 'off');
+  });
+  document.getElementById('dsFx3Toggle').addEventListener('click', function() {
+    var on = !this.classList.contains('on'); applyFx3(on);
+    localStorage.setItem('debug_fx3', on ? 'on' : 'off');
+  });
+  document.getElementById('dsFx4Toggle').addEventListener('click', function() {
+    var on = !this.classList.contains('on'); applyFx4(on);
+    localStorage.setItem('debug_fx4', on ? 'on' : 'off');
+  });
+
+  document.getElementById('dsZoomSlider').value = savedZoom;
+  document.getElementById('dsZoomSlider').addEventListener('input', function() {
+    var z = this.value; applyZoom(z);
+    localStorage.setItem('debug_zoom', z);
+  });
+
+  document.getElementById('dsThemeBtn').addEventListener('click', function() {
+    if (typeof toggleTheme === 'function') toggleTheme();
+  });
+
+  document.getElementById('dsLangBtn').addEventListener('click', function() {
+    var newLang = (window.__filmotivLang === 'ru') ? 'en' : 'ru';
+    applyLang(newLang);
+    localStorage.setItem('debug_lang', newLang);
+  });
+
+  document.getElementById('dsResetBtn').addEventListener('click', function() {
+    localStorage.removeItem('debug_zoom');
+    localStorage.removeItem('debug_fx1');
+    localStorage.removeItem('debug_fx2');
+    localStorage.removeItem('debug_fx3');
+    localStorage.removeItem('debug_fx4');
+    localStorage.removeItem('debug_lang');
+    applyZoom(100);
+    applyFx1(false); applyFx2(false); applyFx3(false); applyFx4(false);
+    applyLang('ru');
+    console.log('[debug] Settings reset');
+  });
+
+  console.log('[debug-effects] Settings panel ready. Zoom:', savedZoom + '%');
+})();
+</script>
+
+</body>
+</html>
