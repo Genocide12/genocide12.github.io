@@ -41,8 +41,11 @@
         .catch(function() { return null; });
     }
     if (cat === 'popular') {
-      // «Смотрят онлайн» — топ-100 популярных Кинопоиска (чем интересуются сейчас)
-      return fetch(App.CORE.resolveApi('/api/kinopoisk?q=v2.2/films/top?type=TOP_100_POPULAR_FILMS&page=1'))
+      // «Смотрят онлайн» — топ-100 популярных Кинопоиска (чем интересуются сейчас).
+      // ВНИМАНИЕ: URL-конвенция — path-style /api/kinopoisk/<path>?<params>.
+      // Вариант «?q=v2.2/films/top?type=...» сломан: q захватывает вложенный
+      // «?type=...», sanitize-regex отвечает 400 Invalid path (урок v177/v179).
+      return fetch(App.CORE.resolveApi('/api/kinopoisk/v2.2/films/top?type=TOP_100_POPULAR_FILMS&page=1'))
         .then(function(r) { return r.ok ? r.json() : null; })
         .catch(function() { return null; });
     }
@@ -741,12 +744,20 @@
           else heroBuild(films);
         });
       };
-      var pop = readCatCache('popular');
-      if (pop) heroFill(pop);
-      else fetchCat('popular').then(function(data) {
-        var films = (data && (data.films || data.items)) || [];
-        if (films.length > 0) heroFill(films);
-      });
+      var heroTry = function() {
+        var hero = $('cyberHero');
+        if (!hero || hero.children.length > 0) return;
+        var pop = readCatCache('popular');
+        if (pop && pop.length > 0) { heroFill(pop); return; }
+        fetchCat('popular').then(function(data) {
+          var films = (data && (data.films || data.items)) || [];
+          if (films.length > 0) heroFill(films);
+        });
+      };
+      heroTry();
+      // Прогрев app.js кладёт кеш popular_1 чуть позже — пробуем ещё раз,
+      // если первый заход ушёл в сеть и промахнулся (гонка с прогревом).
+      setTimeout(heroTry, 2600);
     } catch (_) {}
     try {
       window.addEventListener('pageshow', function() { renderRecent(); refreshFavButtons(); syncServerFavs(); });

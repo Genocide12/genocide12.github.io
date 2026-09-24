@@ -3,7 +3,7 @@
 // Only caches static assets (JS/CSS/images) for offline.
 // HTML pages go directly to network — no SW interference.
 
-const CACHE_NAME = 'filmotiv-v179';
+const CACHE_NAME = 'filmotiv-v180';
 const STATIC_ASSETS = [
   '/css/app.css',
   '/css/cyber.css',
