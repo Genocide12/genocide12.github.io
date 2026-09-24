@@ -207,7 +207,11 @@
   function heroBuild(films) {
     var hero = $('cyberHero');
     if (!hero || !films || films.length === 0) return;
-    heroFilms = films.filter(function(f) { return posterOf(f); }).slice(0, 5);
+    // v182: 10-20 фильмов в «Смотрят онлайн» (было 5). Берём до 16 —
+    // топ-100 Кинопоиска page=1 как раз даёт 20 кандидатов.
+    // Фоны грузим ЛЕНИВО: только активный слайд и соседние (heroLoadBg),
+    // иначе 16 больших постеров ломили бы сеть на мобильных.
+    heroFilms = films.filter(function(f) { return posterOf(f); }).slice(0, 16);
     if (heroFilms.length === 0) return;
     // Надпись «Смотрят онлайн» — ВНУТРИ блока cyber-hero (запрос пользователя),
     // с пульсирующим live-индикатором: фильмы — топ-100 Кинопоиска.
@@ -225,8 +229,9 @@
       if (f.filmLength) meta.push(esc(f.filmLength) + ' мин');
       var r = ratingOf(f);
       html += '<div class="cyber-hero-slide' + (i === 0 ? ' active' : '') + '" data-i="' + i + '">' +
-        '<img class="cyber-hero-bg" src="' + esc(f.posterUrl || posterOf(f)) + '" alt="" ' +
-        (i === 0 ? 'fetchpriority="high"' : 'loading="lazy"') + ' decoding="async">' +
+        (i === 0
+          ? '<img class="cyber-hero-bg" src="' + esc(f.posterUrl || posterOf(f)) + '" alt="" fetchpriority="high" decoding="async">'
+          : '<img class="cyber-hero-bg" data-src="' + esc(f.posterUrl || posterOf(f)) + '" alt="" decoding="async">') +
         '<div class="cyber-hero-content">' +
           '<div class="cyber-hero-title">' + esc(titleOf(f)) + '</div>' +
           '<div class="cyber-hero-meta">' +
@@ -254,6 +259,23 @@
     heroTimer = setInterval(function() { heroShow((heroIdx + 1) % heroFilms.length); }, 7000);
   }
 
+  // Ленивая подгрузка фонов hero: активный слайд + соседние (i-1, i+1)
+  function heroLoadBg(i) {
+    var hero = $('cyberHero');
+    if (!hero) return;
+    var slides = hero.querySelectorAll('.cyber-hero-slide');
+    var want = [i - 1, i, i + 1];
+    for (var w = 0; w < want.length; w++) {
+      var k = want[w];
+      if (k < 0 || k >= slides.length) continue;
+      var img = slides[k].querySelector('.cyber-hero-bg');
+      if (img && img.getAttribute('data-src') && !img.getAttribute('src')) {
+        img.setAttribute('src', img.getAttribute('data-src'));
+        img.removeAttribute('data-src');
+      }
+    }
+  }
+
   function heroShow(i) {
     heroIdx = i;
     var hero = $('cyberHero');
@@ -262,6 +284,7 @@
     var dots = hero.querySelectorAll('.cyber-hero-dot');
     for (var k = 0; k < slides.length; k++) slides[k].classList.toggle('active', k === i);
     for (var d = 0; d < dots.length; d++) dots[d].classList.toggle('active', d === i);
+    heroLoadBg(i);
     var cnt = $('cyberHeroCount');
     if (cnt) cnt.textContent = ('0' + (i + 1)).slice(-2) + ' / ' + ('0' + slides.length).slice(-2);
   }

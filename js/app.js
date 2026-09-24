@@ -782,8 +782,11 @@
       }
     },
     // Прямая батч-проверка с ограничением параллельности
-    // Сессионная квота проверок embess (щадящий режим v181)
-    _embessQuota: 120,
+    // Сессионная квота проверок embess (v182: 24 — раньше 120 добивали
+    // лимит embess на IP пользователя и ломали ПЛЕЕР: 422 на всё).
+    // Первая линия обороны — ОБЩИЙ серверный кеш _embed-cache (Supabase):
+    // результаты, собранные всеми пользователями, embess почти не нужен.
+    _embessQuota: 24,
     _embessBatch: async function(ids) {
       var out = {};
       var idx = 0;
@@ -819,34 +822,67 @@
       }
       if (ids.length > 0) {
         var resolved = null;
-        // Circuit breaker: если предыдущий батч вернул ТОЛЬКО 422/сбои
-        // (троттлинг embess) — не долбим embess 10 минут, чтобы не ломать
-        // плеер пользователю. Fail-open: считаем всё доступным.
+        var confirmed = {}; // только проверенные embess факты (для общего кеша)
         var cb = 0;
         try { cb = parseInt(sessionStorage.getItem('filmotiv_embess_cb') || '0', 10) || 0; } catch (_) {}
         var cbActive = cb > 0 && (Date.now() - cb) < 10 * 60 * 1000;
-        // 1) Прямая проверка embess из браузера (как делает плеер)
-        if (!cbActive) {
-          try { resolved = await this._embessBatch(ids.slice(0, 60)); } catch (_) { resolved = null; }
-          var knownCnt = 0;
-          if (resolved) for (var rk in resolved) {
-            if (Object.prototype.hasOwnProperty.call(resolved, rk) && resolved[rk] !== null && resolved[rk] !== undefined) knownCnt++;
+        // 0) ОБЩИЙ серверный кеш (v182): то, что уже проверили другие
+        // пользователи. Не тратит ни квоту, ни запросы embess.
+        try {
+          var cUrl = App.CORE.API_BASE + '/_embed-cache?ids=' + encodeURIComponent(ids.slice(0, 120).join(','));
+          var cData = await App.MOVIES.apiGet(cUrl);
+          if (cData && cData.available) {
+            resolved = {};
+            for (var ck in cData.available) {
+              if (Object.prototype.hasOwnProperty.call(cData.available, ck)) {
+                resolved[String(ck)] = cData.available[ck] === true;
+              }
+            }
+            console.log('[avail] shared cache hit:', Object.keys(resolved).length, '/', ids.length);
           }
-          if (ids.length >= 4 && knownCnt === 0) {
-            try { sessionStorage.setItem('filmotiv_embess_cb', String(Date.now())); } catch (_) {}
-            console.log('[avail] embess throttled (all 422/err) — circuit breaker ON for 10 min');
+        } catch (_) { /* сервер недоступен — идём дальше */ }
+        // 1) Прямая проверка embess из браузера (только незнакомые id,
+        // максимум 24 за сессию, 2 воркера со стаггером)
+        var unknown = [];
+        for (var ui = 0; ui < ids.length; ui++) {
+          if (!resolved || (resolved[ids[ui]] !== true && resolved[ids[ui]] !== false)) unknown.push(ids[ui]);
+        }
+        if (unknown.length > 0 && !cbActive) {
+          var batch = null;
+          try { batch = await this._embessBatch(unknown.slice(0, 24)); } catch (_) { batch = null; }
+          if (batch) {
+            if (!resolved) resolved = {};
+            var knownCnt = 0;
+            for (var bk in batch) {
+              if (!Object.prototype.hasOwnProperty.call(batch, bk)) continue;
+              resolved[bk] = batch[bk];
+              if (batch[bk] === true || batch[bk] === false) { confirmed[bk] = batch[bk]; knownCnt++; }
+            }
+            if (unknown.length >= 4 && knownCnt === 0) {
+              try { sessionStorage.setItem('filmotiv_embess_cb', String(Date.now())); } catch (_) {}
+              console.log('[avail] embess throttled (all 422/err) — circuit breaker ON for 10 min');
+            }
           }
-        } else {
+        } else if (unknown.length > 0) {
           console.log('[avail] circuit breaker active — fail-open');
         }
+        // 1b) Подтверждённые факты делим со всеми (fire-and-forget):
+        // следующий пользователь возьмёт их из общего кеша и НЕ будет
+        // дёргать embess — именно серией таких проверок и ломался плеер.
+        var confCnt = 0; for (var fx in confirmed) { confCnt++; break; }
+        if (confCnt > 0) {
+          try {
+            App.CORE.apiPost('/api/kinopoisk?q=_embed-cache', { results: confirmed }).catch(function() {});
+          } catch (_) {}
+        }
         // 2) Fallback: серверный батч (полезен, если embess ограничил браузер)
-        var allUnknown = resolved === null || ids.every(function(x) { return resolved[x] === null || resolved[x] === undefined; });
+        var allUnknown = resolved === null || unknown.every(function(x) { return resolved[x] === null || resolved[x] === undefined; });
         if (allUnknown) {
           try {
-            var url = App.CORE.API_BASE + '/_embed-check?ids=' + encodeURIComponent(ids.slice(0, 60).join(','));
+            var url = App.CORE.API_BASE + '/_embed-check?ids=' + encodeURIComponent(unknown.slice(0, 60).join(','));
             var data = await App.MOVIES.apiGet(url);
             if (data && data.available) {
-              resolved = {};
+              if (!resolved) resolved = {};
               for (var k in data.available) {
                 if (Object.prototype.hasOwnProperty.call(data.available, k)) {
                   resolved[String(k)] = data.available[k] !== false;

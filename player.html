@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://api.embess.ws" crossorigin>
   <link rel="dns-prefetch" href="https://api.embess.ws">
   <script src="/i18n.js"></script>
-  <script src="/js/api-origin.js?v=181"></script>
+  <script src="/js/api-origin.js?v=182"></script>
   <!-- Vercel Web Analytics (vanilla HTML CDN approach per Vercel docs) -->
   <script defer src="https://cdn.vercel-insights.com/v1/script.js"></script>
   <title>Плеер</title>
@@ -467,7 +467,7 @@
         <div class="dl-sub" id="dlSub"></div>
         <div class="dl-status" id="dlStatus">Ищем раздачи…</div>
         <div class="dl-results" id="dlResults"></div>
-        <div class="dl-note">Поиск через TorAPI: Кинозал, RuTracker, RuTor, NoNameClub. «Открыть magnet» — в торрент-клиенте (qBittorrent и др.).</div>
+        <div class="dl-note">RuTor — встроенный поиск (magnet без регистраций) + TorAPI-базы: Кинозал, RuTracker, NoNameClub. Свой TorAPI (Lifailon/TorAPI или Kinozal-Bot локально) добавляется в localStorage.filmotiv_torapi_bases, например http://localhost:8443.</div>
       </div>
     </div>
   </div>
@@ -1026,7 +1026,7 @@
       return loop();
     }
     function buildPlayerHtml(html) {
-      var bridgeTag = '<script src="https://' + window.location.host + '/bridge.js?v=181' + (__bridgePremium ? '&premium=1' : '') + '"><\/script>';
+      var bridgeTag = '<script src="https://' + window.location.host + '/bridge.js?v=182' + (__bridgePremium ? '&premium=1' : '') + '"><\/script>';
       var baseTag = '<base href="https://api.embess.ws/">';
       var referrerMeta = '<meta name="referrer" content="no-referrer">';
       if (/<head[^>]*>/i.test(html)) {
@@ -1044,6 +1044,7 @@
       __bridgePremium = !!premium;
       var upstreamUrl = 'https://api.embess.ws/embed/kp/' + encodeURIComponent(kid);
       console.log('[player] Fetching', upstreamUrl);
+      __bgRetry.gen++; // гасим возможный фоновый ретрай от прошлого запуска
       hidePlayerError();
       loadingOverlay.classList.remove('hidden');
       fetchEmbessHtml(upstreamUrl)
@@ -1075,10 +1076,41 @@
             iframe.removeAttribute('src');
             iframe.srcdoc = buildPlayerHtml(html);
           }).catch(function() {
-            if (!__playStarted) showPlayerError('throttled');
+            if (!__playStarted) { showPlayerError('throttled'); startBgRetry(upstreamUrl); }
           });
         }, 7000);
       });
+    }
+    // v182: фоновые ретраи при долгом троттлинге embess — раз в 15с до 12
+    // попыток (~3 мин). Ошибка 422 обычно отпускает в течение минуты;
+    // когда fetch удаётся, плеер сам подменяется на рабочую версию.
+    var __bgRetry = { gen: 0, timer: null };
+    function startBgRetry(url) {
+      var gen = ++__bgRetry.gen;
+      if (__bgRetry.timer) { clearInterval(__bgRetry.timer); __bgRetry.timer = null; }
+      var tries = 0;
+      var sub = document.getElementById('peSub');
+      __bgRetry.timer = setInterval(function() {
+        if (gen !== __bgRetry.gen || __playStarted) {
+          clearInterval(__bgRetry.timer); __bgRetry.timer = null; return;
+        }
+        tries++;
+        if (tries > 12) {
+          clearInterval(__bgRetry.timer); __bgRetry.timer = null;
+          if (sub) sub.textContent = 'Источник недоступен дольше обычного. Нажмите «Ещё раз» или скачайте фильм через торрент.';
+          return;
+        }
+        if (sub) sub.textContent = 'Пробуем ещё раз автоматически (' + tries + '/12)…';
+        fetchEmbessHtml(url).then(function(html) {
+          if (gen !== __bgRetry.gen || __playStarted) return;
+          if (__bgRetry.timer) { clearInterval(__bgRetry.timer); __bgRetry.timer = null; }
+          console.log('[player] Bg retry OK after', tries, 'tries → srcdoc');
+          iframe.removeAttribute('src');
+          iframe.srcdoc = buildPlayerHtml(html);
+          hidePlayerError();
+          showToast('Плеер загрузился — приятного просмотра!', 2500);
+        }).catch(function() {});
+      }, 15000);
     }
     function fetchPremium() {
       return new Promise(function(resolve) {
@@ -1328,7 +1360,7 @@
         if (s) s.textContent = 'Источник пока не добавил этот фильм. Скачайте через торрент или откройте другой фильм.';
       } else {
         if (t) t.textContent = 'Плеер недоступен';
-        if (s) s.textContent = 'Источник перегружен или заблокирован. Попробуйте ещё раз или скачайте фильм.';
+        if (s) s.textContent = 'Источник временно перегружен. Пробуем ещё раз автоматически — обычно проходит за пару минут.';
       }
       el.classList.add('visible');
     }
@@ -1415,35 +1447,101 @@
       if (sub) sub.textContent = title;
       var results = document.getElementById('dlResults');
       if (results) results.innerHTML = '';
-      dlStatus('Ищем TorAPI-сервер…');
-      var base = await torProbe();
-      if (!base) {
-        dlStatus('TorAPI недоступен (' + torBases()[0] + ' не отвечает). Попробуйте позже, включите VPN или добавьте свой адрес в localStorage.filmotiv_torapi_bases.');
-        return;
-      }
       dlStatus('Ищем раздачи…');
       var yr = await ensureFilmYear();
+      var total = 0;
+      // 1) ВСТРОЕННЫЙ серверный поиск (v182): наш /api/kinopoisk?q=_dl-search
+      // сам ходит на rutor.info и возвращает magnets — работает без
+      // TorAPI-инстансов (которые на Vercel не живы: трекеры режут их IP).
       try {
-        var q = base + '/api/search/title/all?query=' + encodeURIComponent(title) +
-                (yr ? '&year=' + encodeURIComponent(yr) : '') + '&page=0';
-        var r = await fetch(q);
-        if (!r.ok) throw new Error('HTTP ' + r.status);
-        var data = await r.json();
-        var total = 0;
-        if (results) {
-          TOR_GROUPS.forEach(function(g) {
-            var arr = (data && data[g.key]) || [];
-            if (!Array.isArray(arr) || arr.length === 0) return;
-            total += arr.length;
-            results.appendChild(renderGroup(g, arr));
-          });
+        var dlUrl = '/api/kinopoisk?q=_dl-search&title=' + encodeURIComponent(title) +
+                    (yr ? '&year=' + encodeURIComponent(yr) : '');
+        var r = await (window.FilmotivAPIOrigin
+          ? window.FilmotivAPIOrigin.apiFetch(dlUrl, null, 12000)
+          : fetch(dlUrl));
+        if (r.ok) {
+          var d = await r.json();
+          if (d && d.ok && Array.isArray(d.results) && d.results.length > 0 && results) {
+            results.appendChild(renderRutorList(d.results));
+            total += d.results.length;
+          }
         }
-        dlStatus(total > 0
-          ? 'Найдено раздач: ' + total + (yr ? ' · год ' + yr : '')
-          : 'Ничего не найдено по запросу «' + title + '»');
-      } catch (e) {
-        dlStatus('Ошибка поиска: ' + (e && e.message ? e.message : 'сеть') + ' — сервер ' + base);
+      } catch (_) {}
+      // 2) TorAPI-инстансы (пользовательский + адреса из localStorage)
+      var base = await torProbe();
+      if (base) {
+        try {
+          var q = base + '/api/search/title/all?query=' + encodeURIComponent(title) +
+                  (yr ? '&year=' + encodeURIComponent(yr) : '') + '&page=0';
+          var r2 = await fetch(q);
+          if (r2.ok) {
+            var data = await r2.json();
+            if (results) {
+              TOR_GROUPS.forEach(function(g) {
+                var arr = (data && data[g.key]) || [];
+                if (!Array.isArray(arr) || arr.length === 0) return;
+                total += arr.length;
+                results.appendChild(renderGroup(g, arr));
+              });
+            }
+          }
+        } catch (_) {}
       }
+      if (total > 0) {
+        dlStatus('Найдено раздач: ' + total + (yr ? ' · год ' + yr : ''));
+      } else if (!base) {
+        dlStatus('Встроенный поиск недоступен, TorAPI-инстансы не отвечают. Свой TorAPI (Lifailon/TorAPI или Kinozal-Bot локально) добавьте в localStorage.filmotiv_torapi_bases, например http://localhost:8443 — и откройте панель снова.');
+      } else {
+        dlStatus('Ничего не найдено по запросу «' + title + '»');
+      }
+    }
+    // Плоский список раздач rutor: magnet/torrent уже в руке, разворачивать
+    // нечего — рендерим сразу с кнопками.
+    function renderRutorList(arr) {
+      var wrap = document.createElement('div');
+      wrap.className = 'dl-group';
+      var h = document.createElement('div');
+      h.className = 'dl-group-title';
+      h.textContent = 'RuTor — встроенный поиск (' + arr.length + ')';
+      wrap.appendChild(h);
+      arr.slice(0, 12).forEach(function(item) {
+        var row = document.createElement('div');
+        row.className = 'dl-item';
+        var nm = document.createElement('div');
+        nm.className = 'dl-name';
+        nm.textContent = item.name || 'Раздача';
+        var meta = document.createElement('div');
+        meta.className = 'dl-meta';
+        meta.textContent = [item.size, item.seeds ? 'сидов: ' + item.seeds : '', item.date || ''].filter(Boolean).join(' · ');
+        row.appendChild(nm);
+        row.appendChild(meta);
+        var magRow = document.createElement('div');
+        magRow.className = 'dl-magrow';
+        var a = document.createElement('a');
+        a.className = 'dl-magbtn';
+        if (item.magnet) { a.href = item.magnet; a.textContent = '🧲 Открыть magnet'; }
+        else if (item.torrent) { a.href = item.torrent; a.textContent = '⬇ Скачать .torrent'; }
+        a.target = '_blank';
+        a.rel = 'noopener';
+        magRow.appendChild(a);
+        if (item.magnet) {
+          var cp = document.createElement('button');
+          cp.className = 'dl-copy';
+          cp.textContent = 'Копировать';
+          cp.addEventListener('click', function(e) {
+            e.stopPropagation();
+            try {
+              navigator.clipboard.writeText(item.magnet);
+              cp.textContent = '✓ Скопировано';
+              setTimeout(function() { cp.textContent = 'Копировать'; }, 1500);
+            } catch (_) {}
+          });
+          magRow.appendChild(cp);
+        }
+        row.appendChild(magRow);
+        wrap.appendChild(row);
+      });
+      return wrap;
     }
     function renderGroup(g, arr) {
       var wrap = document.createElement('div');

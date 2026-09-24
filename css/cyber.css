@@ -552,6 +552,11 @@ body.gp-open .gp-backdrop { opacity: 1; pointer-events: auto; }
   display: flex;
   flex-direction: column;
   gap: 7px;
+  /* v182: слайдов до 16 — точки компактнее, чтобы колонка не тянулась */
+  max-height: 70%;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  justify-content: flex-end;
 }
 .cyber-hero-dot {
   width: 9px;
@@ -1248,7 +1253,8 @@ body.view-search .pm-search .search-container {
   .cyber-hero-content { padding: 20px 20px 24px; max-width: none; }
   .cyber-hero-count { display: none; }
   .cyber-hero-head { top: 12px; left: 12px; padding: 6px 12px; font-size: 12.5px; gap: 7px; }
-  .cyber-hero-dots { flex-direction: row; top: 14px; right: 14px; }
+  .cyber-hero-dots { flex-direction: row; top: 14px; right: 14px; left: auto; max-height: none; gap: 5px; max-width: 55%; justify-content: flex-end; }
+  .cyber-hero-dot { width: 6px; height: 6px; }
   .cyber-row { grid-auto-columns: 132px; gap: 11px; }
   .cyber-chips { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .film-grid { grid-template-columns: repeat(auto-fill, minmax(124px, 1fr)); gap: 14px 10px; }
