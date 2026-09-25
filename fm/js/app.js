@@ -491,6 +491,11 @@
       } else if (tgIdFromUrl && !telegramLogin) {
         localStorage.setItem('filmotiv_tg_user_id', String(tgIdFromUrl));
         if (tgNameFromUrl) localStorage.setItem('filmotiv_tg_user_name', tgNameFromUrl);
+        if (tgUsernameFromUrl) localStorage.setItem('filmotiv_tg_username', tgUsernameFromUrl);
+        localStorage.removeItem('filmotiv_user_id');
+        // v195: тост успеха — теперь и для входа по ссылке из бота (?tg_id=),
+        // не только для OIDC (v194 ставил флаг только в success-ветке).
+        try { sessionStorage.setItem('filmotiv_just_logged_in', tgNameFromUrl || tgUsernameFromUrl || 'Telegram'); } catch (_) {}
         history.replaceState(null, '', window.location.pathname);
         window.location.reload();
       }
