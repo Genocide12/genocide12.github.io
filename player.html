@@ -1065,6 +1065,7 @@
     // Реклама отсутствует ВООБЩЕ (их скрипты не загружаются) — в т.ч.
     // для премиума, как просил пользователь.
     var __flixReadyTimer = null;
+    var __flixFails = 0; // повторные попытки — обход кеша подписей (fresh=1)
 
     function installBackupPlayer(qualities) {
       if (__playStarted) return;
@@ -1081,6 +1082,7 @@
     }
     function onBackupReady() {
       if (__playStarted) return;
+      __flixFails = 0;
       if (__flixReadyTimer) { clearTimeout(__flixReadyTimer); __flixReadyTimer = null; }
       console.log('[player] OK via flix-backup in', ((performance.now() - loadStartTime) / 1000).toFixed(2) + 's');
       loadingOverlay.classList.add('hidden');
@@ -1088,6 +1090,7 @@
     }
     function onBackupError(msg) {
       if (__playStarted) return;
+      __flixFails++;
       console.warn('[player] flix-backup error:', msg || 'unknown');
       if (__flixReadyTimer) { clearTimeout(__flixReadyTimer); __flixReadyTimer = null; }
       showPlayerError('throttled');
@@ -1100,8 +1103,8 @@
       loadingOverlay.classList.remove('hidden');
       setProgress('Подключение резервного источника…');
       var edge = (window.FilmotivAPIOrigin && window.FilmotivAPIOrigin.edgeUrl)
-        ? window.FilmotivAPIOrigin.edgeUrl('/api/embed-edge?src=flix&id=' + encodeURIComponent(kid))
-        : ('/api/embed-edge?src=flix&id=' + encodeURIComponent(kid));
+        ? window.FilmotivAPIOrigin.edgeUrl('/api/embed-edge?src=flix&id=' + encodeURIComponent(kid) + (__flixFails > 0 ? '&fresh=1' : ''))
+        : ('/api/embed-edge?src=flix&id=' + encodeURIComponent(kid) + (__flixFails > 0 ? '&fresh=1' : ''));
       var ctrl = new AbortController();
       var timer = setTimeout(function() { try { ctrl.abort(); } catch (_) {} }, 15000);
       fetch(edge, { signal: ctrl.signal }).then(function(r) {
