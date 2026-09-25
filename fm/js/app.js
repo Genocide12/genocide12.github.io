@@ -431,6 +431,8 @@
       var tgUsernameFromUrl = urlParams.get('tg_username');
 
       if (telegramLogin === 'success' && tgIdFromUrl) {
+        // v194: после перезагрузки показываем подтверждение входа (иначе
+        // успешный вход выглядит как «просто обновилась страница»).
         // SYNC FIX: выгружаем локальную коллекцию гостя в аккаунт ДО перезагрузки.
         // Раньше favourites, добавленные на сайте до логина, оставались только
         // в sessionStorage и терялись (серверная миграция web_* строк не находила —
@@ -460,10 +462,31 @@
         if (tgNameFromUrl) localStorage.setItem('filmotiv_tg_user_name', tgNameFromUrl);
         if (tgUsernameFromUrl) localStorage.setItem('filmotiv_tg_username', tgUsernameFromUrl);
         localStorage.removeItem('filmotiv_user_id');
+        try { sessionStorage.setItem('filmotiv_just_logged_in', tgNameFromUrl || tgUsernameFromUrl || 'Telegram'); } catch (_) {}
         history.replaceState(null, '', window.location.pathname);
         window.location.reload();
       } else if (telegramLogin === 'error') {
-        console.error('[tg] OIDC login error:', urlParams.get('message'));
+        // v194: вход НЕ молча — показываем ПОНЯТНУЮ причину тостом (раньше
+        // ошибка выглядела как «просто обновилась страница» и владелец
+        // считал, что кнопка не работает).
+        var errCode = urlParams.get('message');
+        console.error('[tg] OIDC login error:', errCode);
+        var ERR_TEXT = {
+          access_denied: 'Вход отменён в Telegram',
+          session_expired: 'Сессия входа истекла — попробуйте ещё раз',
+          invalid_state: 'Сбой проверки безопасности — попробуйте ещё раз',
+          server_misconfigured: 'Сервер не настроен — напишите разработчику',
+          token_exchange_failed: 'Telegram не выдал токен — попробуйте ещё раз',
+          no_id_token: 'Telegram не выдал токен — попробуйте ещё раз',
+          invalid_issuer: 'Недопустимый источник токена',
+          invalid_audience: 'Недопустимый получатель токена',
+          token_expired: 'Токен истёк — попробуйте ещё раз',
+          no_bot_api_id_in_jwt: 'Telegram вернул неполные данные'
+        };
+        var errText = ERR_TEXT[errCode] || 'Не удалось войти — попробуйте ещё раз';
+        if (typeof App.UI !== 'undefined' && App.UI.showToast) {
+          App.UI.showToast('⚠️ ' + errText + '. Запасной способ — «💬 Войти через бота» в коллекции ❤️', 6000);
+        }
         history.replaceState(null, '', window.location.pathname);
       } else if (tgIdFromUrl && !telegramLogin) {
         localStorage.setItem('filmotiv_tg_user_id', String(tgIdFromUrl));
@@ -1181,8 +1204,11 @@
           try { guestId = localStorage.getItem('filmotiv_user_id') || ''; } catch (_) {}
           var loginUrl = '/api/auth/telegram/login' + (guestId.indexOf('web_') === 0 ? '?guest_id=' + encodeURIComponent(guestId) : '');
           var loginHtml = 'Войдите через Telegram, чтобы видеть свою коллекцию ❤️<br>' +
-            '<a class="login-cta" href="' + loginUrl + '">🔑 Войти через Telegram</a><br>' +
-            '<span class="login-hint">Коллекция, история и премиум едины на сайте и в мини-аппе</span>';
+            '<a class="login-cta" href="' + loginUrl + '">🔑 Войти через Telegram</a>' +
+            '<span class="login-hint">Откроется страница Telegram — подтвердите вход там.<br>Коллекция, история и премиум едины на сайте и в мини-аппе</span>' +
+            '<div class="login-alt">или</div>' +
+            '<a class="login-cta login-cta-sec" href="https://t.me/Filmotivbot?start=login" target="_blank" rel="noopener">💬 Войти через бота</a>' +
+            '<span class="login-hint">В боте нажмите START (или отправьте /login) — бот пришлёт кнопку «Открыть в браузере»</span>';
           if (data.is_guest) {
             App.UI.showEmptyState(loginHtml, '🔑');
           } else if (data.reauth) {
@@ -1476,6 +1502,16 @@
 
   // ====== Handle OAuth redirect (if returning from Telegram login) ======
   App.AUTH.handleOAuthRedirect();
+
+  // v194: подтверждение успешного входа после перезагрузки (флаг ставит
+  // handleOAuthRedirect) — пользователь видит, что вход состоялся.
+  try {
+    var justLoggedIn = sessionStorage.getItem('filmotiv_just_logged_in');
+    if (justLoggedIn) {
+      sessionStorage.removeItem('filmotiv_just_logged_in');
+      if (App.UI && App.UI.showToast) App.UI.showToast('✅ Вы вошли как ' + justLoggedIn + ' — коллекция синхронизирована', 4500);
+    }
+  } catch (_) {}
 
   // ====== Setup login bar + auth check ======
   // Restore premium badge from localStorage cache (instant, before /api/me)

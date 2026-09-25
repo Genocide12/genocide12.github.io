@@ -512,6 +512,31 @@ a { color: #c4b5fd; }
 }
 .empty-icon { font-size: 58px; margin-bottom: 14px; }
 .empty-text { color: var(--muted); font-size: 14px; line-height: 1.55; }
+/* v194: блок входа в пустой коллекции — две кнопки (OIDC + бот) и подсказки */
+.empty-text .login-cta {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    margin: 14px 6px 6px; padding: 13px 26px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, var(--purple), var(--pink));
+    border: 1px solid rgba(255,255,255,.18);
+    box-shadow: 0 8px 24px rgba(139,92,246,.35);
+    color: #fff; font-size: 15px; font-weight: 800;
+    text-decoration: none; transition: transform .2s, box-shadow .2s;
+}
+.empty-text .login-cta:active { transform: scale(.96); }
+.empty-text .login-cta-sec {
+    background: rgba(139,92,246,.12);
+    border: 1px solid rgba(168,132,252,.45);
+    box-shadow: none; color: #d9ccff;
+}
+.empty-text .login-hint {
+    display: block; margin-top: 8px;
+    color: var(--muted); font-size: 12.5px; line-height: 1.5;
+}
+.empty-text .login-alt {
+    margin: 12px 0 2px; color: var(--muted);
+    font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
+}
 
 /* ---------- 13. СЕТКА ФИЛЬМОВ (poster + glass-info + XP-рейтинг) ---------- */
 .film-grid {
