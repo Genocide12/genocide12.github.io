@@ -1214,12 +1214,12 @@
           var guestId = '';
           try { guestId = localStorage.getItem('filmotiv_user_id') || ''; } catch (_) {}
           var loginUrl = '/api/auth/telegram/login' + (guestId.indexOf('web_') === 0 ? '?guest_id=' + encodeURIComponent(guestId) : '');
-          // v198: ОДНА кнопка авторизации (как в живом Genopoisk) — «💬 Войти
+          // v199: ОДНА кнопка авторизации (как в живом Genopoisk) — «💬 Войти
           // через бота» удалена по просьбе владельца: дублировала вход и
           // путала (два разных пути к одной цели).
           var loginHtml = 'Войдите через Telegram, чтобы видеть свою коллекцию ❤️<br>' +
             '<a class="login-cta" href="' + loginUrl + '">🔑 Войти через Telegram</a>' +
-            '<span class="login-hint">Откроется страница Telegram — подтвердите вход там.<br>Коллекция, история и премиум едины на сайте и в мини-аппе</span>';
+            '<span class="login-hint">Откроется страница Telegram — подтвердите вход там.<br>При первом входе Telegram попросит номер телефона — это один раз.<br>Коллекция, история и премиум едины на сайте и в мини-аппе</span>';
           if (data.is_guest) {
             App.UI.showEmptyState(loginHtml, '🔑');
           } else if (data.reauth) {
