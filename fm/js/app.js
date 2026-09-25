@@ -357,15 +357,19 @@
         fixedBtn.classList.add('hidden-by-tv');
       } else {
         fixedBtn.classList.remove('hidden');
-        // v193: кнопка ВСЕГДА ведёт на бота в Telegram (t.me), как устроено
-        // в живом Genopoisk: раньше гостям href подменялся на OAuth
-        // /api/auth/telegram/login — до whitelist домена в @BotFather
-        // (/setdomain) Telegram отвечал «Bot domain invalid» и кнопка
-        // «не работала». Прямая t.me-ссылка работает всегда и без условий.
-        // Вход через Telegram-OIDC остаётся доступен по кнопке «🔑 Войти
-        // через Telegram» в пустом состоянии коллекции.
+        // v198: как в живом Genopoisk — гость по кнопке бара попадает на
+        // Telegram-вход (OIDC), а не в чат бота. Причина отказа от OAuth в
+        // v193 («Bot domain invalid») устранена: владелец выполнил
+        // /setdomain filmotiv.duckdns.org — страница входа проверена живьём.
+        // Залогиненным по-прежнему открываем бота (t.me?start=app).
         if (fixedText) fixedText.textContent = 'Открыть Telegram';
-        fixedBtn.href = 'https://t.me/Filmotivbot?start=app';
+        if (isLoggedIn) {
+          fixedBtn.href = 'https://t.me/Filmotivbot?start=app';
+        } else {
+          var guestId = '';
+          try { guestId = localStorage.getItem('filmotiv_user_id') || ''; } catch (_) {}
+          fixedBtn.href = '/api/auth/telegram/login' + (guestId.indexOf('web_') === 0 ? '?guest_id=' + encodeURIComponent(guestId) : '');
+        }
         fixedBtn.onclick = null;
       }
     },
@@ -486,8 +490,9 @@
           no_bot_api_id_in_jwt: 'Telegram вернул неполные данные'
         };
         var errText = ERR_TEXT[errCode] || 'Не удалось войти — попробуйте ещё раз';
+        // v198: «Запасной способ — Войти через бота» убран из текста — кнопки больше нет
         if (typeof App.UI !== 'undefined' && App.UI.showToast) {
-          App.UI.showToast('⚠️ ' + errText + '. Запасной способ — «💬 Войти через бота» в коллекции ❤️', 6000);
+          App.UI.showToast('⚠️ ' + errText, 6000);
         }
         history.replaceState(null, '', window.location.pathname);
       } else if (tgIdFromUrl && !telegramLogin) {
@@ -1209,12 +1214,12 @@
           var guestId = '';
           try { guestId = localStorage.getItem('filmotiv_user_id') || ''; } catch (_) {}
           var loginUrl = '/api/auth/telegram/login' + (guestId.indexOf('web_') === 0 ? '?guest_id=' + encodeURIComponent(guestId) : '');
+          // v198: ОДНА кнопка авторизации (как в живом Genopoisk) — «💬 Войти
+          // через бота» удалена по просьбе владельца: дублировала вход и
+          // путала (два разных пути к одной цели).
           var loginHtml = 'Войдите через Telegram, чтобы видеть свою коллекцию ❤️<br>' +
             '<a class="login-cta" href="' + loginUrl + '">🔑 Войти через Telegram</a>' +
-            '<span class="login-hint">Откроется страница Telegram — подтвердите вход там.<br>Коллекция, история и премиум едины на сайте и в мини-аппе</span>' +
-            '<div class="login-alt">или</div>' +
-            '<a class="login-cta login-cta-sec" href="https://t.me/Filmotivbot?start=login" target="_blank" rel="noopener">💬 Войти через бота</a>' +
-            '<span class="login-hint">В боте нажмите START (или отправьте /login) — бот пришлёт кнопку «Открыть в браузере»</span>';
+            '<span class="login-hint">Откроется страница Telegram — подтвердите вход там.<br>Коллекция, история и премиум едины на сайте и в мини-аппе</span>';
           if (data.is_guest) {
             App.UI.showEmptyState(loginHtml, '🔑');
           } else if (data.reauth) {
