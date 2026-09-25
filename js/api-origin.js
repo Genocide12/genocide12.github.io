@@ -134,7 +134,21 @@
     return (list[0] || VERCEL) + path;
   }
 
-  // Авто-переход на зеркало при недоступности прод-API (только на vercel).
+  // Авто-переход при недоступности прод-API (только на vercel-хостах).
+  // v189: целевой хост выбирается динамически — сначала пробуем СВОЙ чистый
+  // домен filmotiv.duckdns.org (полноценное приложение, same-origin API);
+  // если и он мёртв из сети пользователя — зеркало genocide12.github.io
+  // (статика + кросс-доменная ротация API). Путь/query/Telegram-хеш сохраняются.
+  function currentPath() {
+    try { return location.pathname + location.search + location.hash; } catch (_) { return '/'; }
+  }
+  function probeDuck(cb) {
+    var ctrl = (typeof AbortController === 'function') ? new AbortController() : null;
+    var timer = ctrl ? setTimeout(function() { try { ctrl.abort(); } catch (_) {} }, 3500) : null;
+    fetch(DUCKDNS + '/api/me', ctrl ? { method: 'OPTIONS', signal: ctrl.signal, cache: 'no-store', mode: 'cors' } : { method: 'OPTIONS', cache: 'no-store', mode: 'cors' })
+      .then(function(r) { if (timer) clearTimeout(timer); cb(!!(r.ok || r.status === 204)); })
+      .catch(function() { if (timer) clearTimeout(timer); cb(false); });
+  }
   function watchRedirect() {
     if (!/(^|\.)vercel\.app$/.test(location.hostname)) return;
     var tries = 0;
@@ -158,24 +172,30 @@
         });
     }
     function fallbackBar() {
-      console.warn('[origin] prod API недоступен → зеркало через 5с');
-      try {
-        var el = document.createElement('div');
-        el.id = 'mirrorFallbackBar';
-        el.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:2147483647;background:rgba(13,13,22,.97);color:#fff;font:600 13px/1.5 system-ui,sans-serif;padding:12px 16px;text-align:center;border-top:1px solid rgba(255,255,255,.14)';
-        el.innerHTML = '⚠️ Прод-сервер недоступен. Переходим на <a href="' + MIRROR + '" style="color:#a78bfa;font-weight:800;text-decoration:underline">зеркало</a> через <b id="mirrorFbCnt">5</b> с…';
-        var mount = document.body || document.documentElement;
-        mount.appendChild(el);
-        var n = 5;
-        var iv = setInterval(function() {
-          n--;
-          var c = document.getElementById('mirrorFbCnt');
-          if (c) c.textContent = n;
-          if (n <= 0) { clearInterval(iv); try { location.replace(MIRROR); } catch (_) { location.href = MIRROR; } }
-        }, 1000);
-      } catch (_) {
-        try { location.replace(MIRROR); } catch (_) {}
-      }
+      // v189: если duckdns жив — переезжаем ТУДА (приложение целиком, same-origin);
+      // иначе — зеркало, как раньше.
+      probeDuck(function(alive) {
+        var target = alive ? (DUCKDNS + currentPath()) : MIRROR;
+        var targetName = alive ? 'filmotiv.duckdns.org' : 'зеркало';
+        console.warn('[origin] prod API недоступен → ' + targetName + ' через 5с');
+        try {
+          var el = document.createElement('div');
+          el.id = 'mirrorFallbackBar';
+          el.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:2147483647;background:rgba(13,13,22,.97);color:#fff;font:600 13px/1.5 system-ui,sans-serif;padding:12px 16px;text-align:center;border-top:1px solid rgba(255,255,255,.14)';
+          el.innerHTML = '⚠️ Прод-сервер недоступен. Переходим на <a href="' + target + '" style="color:#a78bfa;font-weight:800;text-decoration:underline">' + targetName + '</a> через <b id="mirrorFbCnt">5</b> с…';
+          var mount = document.body || document.documentElement;
+          mount.appendChild(el);
+          var n = 5;
+          var iv = setInterval(function() {
+            n--;
+            var c = document.getElementById('mirrorFbCnt');
+            if (c) c.textContent = n;
+            if (n <= 0) { clearInterval(iv); try { location.replace(target); } catch (_) { location.href = target; } }
+          }, 1000);
+        } catch (_) {
+          try { location.replace(target); } catch (_) {}
+        }
+      });
     }
     if (document.readyState === 'complete') setTimeout(probe, 1500);
     else window.addEventListener('load', function() { setTimeout(probe, 1500); }, { once: true });

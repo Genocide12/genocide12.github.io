@@ -1,9 +1,9 @@
-// Filmotiv Service Worker v188
+// Filmotiv Service Worker v189 (v189: mirror→duckdns auto + watchRedirect duckdns-first)
 // SIMPLIFIED — does NOT intercept navigation requests.
 // Only caches static assets (JS/CSS/images) for offline.
 // HTML pages go directly to network — no SW interference.
 
-const CACHE_NAME = 'filmotiv-v188';
+const CACHE_NAME = 'filmotiv-v189';
 const STATIC_ASSETS = [
   '/css/app.css',
   '/css/cyber.css',
