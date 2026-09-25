@@ -22,6 +22,10 @@
     // Рабочее происхождение «залипает» (sessionStorage + api-origin.js
     // держит час в localStorage). POST-запросы ротируются тем же способом
     // через window.FilmotivAPIOrigin.apiFetch (загружается перед app.js).
+    // v190: DUCKPROXY — edge-прокси проекта Genopoisk (rewrite /fm/*),
+    // обслуживается с ЧИСТОГО пула 76.76.21.21 кастомного домена — вне
+    // vercel-лотереи ТСПУ. На зеркале идёт ПЕРВЫМ.
+    API_ORIGIN_DUCK: 'https://genopoisk.duckdns.org/fm',
     API_ORIGIN_VERCEL: 'https://filmotiv.vercel.app',
     API_ORIGIN_BACKUP: 'https://filmotiv-5sp8sjewa-genocide12s-projects.vercel.app',
     API_PROXY_PREFIX: 'https://api.allorigins.win/raw?url=',
@@ -31,14 +35,14 @@
       var isProd = h.indexOf('vercel.app') !== -1 || h === 'localhost' || h.indexOf('127.0.0.1') !== -1;
       this._apiOrigins = isProd
         ? ['']
-        : [this.API_ORIGIN_VERCEL, this.API_ORIGIN_BACKUP, 'PROXY:' + this.API_PROXY_PREFIX];
+        : [this.API_ORIGIN_DUCK, this.API_ORIGIN_VERCEL, this.API_ORIGIN_BACKUP, 'PROXY:' + this.API_PROXY_PREFIX];
       return this._apiOrigins;
     },
     stickyOrigin: function() {
-      try { var v = parseInt(sessionStorage.getItem('filmotiv_api_origin'), 10); return isNaN(v) ? -1 : v; } catch (_) { return -1; }
+      try { var v = parseInt(sessionStorage.getItem('filmotiv_api_origin_v2'), 10); return isNaN(v) ? -1 : v; } catch (_) { return -1; }
     },
     setStickyOrigin: function(i) {
-      try { sessionStorage.setItem('filmotiv_api_origin', String(i)); } catch (_) {}
+      try { sessionStorage.setItem('filmotiv_api_origin_v2', String(i)); } catch (_) {}
     },
     urlForOrigin: function(origin, url) {
       if (origin === '') return url;
