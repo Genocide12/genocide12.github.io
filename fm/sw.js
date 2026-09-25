@@ -1,4 +1,4 @@
-// Filmotiv Service Worker v192-fm (GitHub Pages /fm/ scope; зеркало = отдельный сайт, без авто-увода)
+// Filmotiv Service Worker v189 (v189: mirror→duckdns auto + watchRedirect duckdns-first)
 // SIMPLIFIED — does NOT intercept navigation requests.
 // Only caches static assets (JS/CSS/images) for offline.
 // HTML pages go directly to network — no SW interference.
