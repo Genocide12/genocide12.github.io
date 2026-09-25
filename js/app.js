@@ -22,13 +22,13 @@
     // Рабочее происхождение «залипает» (sessionStorage + api-origin.js
     // держит час в localStorage). POST-запросы ротируются тем же способом
     // через window.FilmotivAPIOrigin.apiFetch (загружается перед app.js).
-    // v191: ПОЛНАЯ РАЗВЯЗКА ПРОЕКТОВ (запрос пользователя: «разные проекты,
-    // у каждого всё своё»). Удалён edge-прокси Genopoisk; в цепочке —
-    // ТОЛЬКО собственные хосты Filmotiv, включая стабильные
-    // project/branch-хосты (наработка из api-origin.js теперь и в GET-
-    // ротации ленты). Sticky-ключ поднят до v3 (сброс индексов старой
-    // цепочки). Свой чистый домен у Filmotiv (когда появится) встанет
-    // сюда первым без изменения механики.
+    // v188 (бэкпорт из зеркала v191 + свой домен): в GET-цепочку добавлены
+    // стабильные project/branch-хосты (наработка api-origin.js теперь и в
+    // ротации ленты) и СВОЙ чистый домен filmotiv.duckdns.org — первым:
+    // кастом-домены Vercel живут на другом пуле IP (76.76.21.x), который
+    // ТСПУ не режет. Sticky-ключ поднят до v3 (сброс индексов старой
+    // цепочки, синхронно с api-origin.js).
+    API_ORIGIN_DUCKDNS: 'https://filmotiv.duckdns.org',
     API_ORIGIN_VERCEL: 'https://filmotiv.vercel.app',
     API_ORIGIN_PROJECT: 'https://filmotiv-genocide12s-projects.vercel.app',
     API_ORIGIN_BRANCH: 'https://filmotiv-git-main-genocide12s-projects.vercel.app',
@@ -40,7 +40,7 @@
       var isProd = h.indexOf('vercel.app') !== -1 || h === 'localhost' || h.indexOf('127.0.0.1') !== -1;
       this._apiOrigins = isProd
         ? ['']
-        : [this.API_ORIGIN_VERCEL, this.API_ORIGIN_PROJECT, this.API_ORIGIN_BRANCH, this.API_ORIGIN_BACKUP, 'PROXY:' + this.API_PROXY_PREFIX];
+        : [this.API_ORIGIN_DUCKDNS, this.API_ORIGIN_VERCEL, this.API_ORIGIN_PROJECT, this.API_ORIGIN_BRANCH, this.API_ORIGIN_BACKUP, 'PROXY:' + this.API_PROXY_PREFIX];
       return this._apiOrigins;
     },
     stickyOrigin: function() {

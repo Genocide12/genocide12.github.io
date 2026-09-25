@@ -32,18 +32,18 @@
 //      Оба добавлены в цепочку ротации перед per-deployment BACKUP.
 //      Техническое ограничение: если ХОСТ полностью заблокирован (страница
 //      вообще не открылась), JS не выполнится — тут помогает только зеркало.
-// v191 (2026-09-25): ПОЛНАЯ РАЗВЯЗКА ПРОЕКТОВ Filmotiv и Genopoisk
-//   (запрос владельца: «это разные проекты, у каждого всё своё»).
-//   Удалён прокси через чужой проект (см. git-историю, коммит 9011e57) —
-//   зеркало Filmotiv использует ТОЛЬКО собственные хосты Filmotiv.
-//   Вся механика ротации/фоллбеков (наработка) сохранена — при появлении
-//   у Filmotiv своего чистого домена он просто встанет первым в этот же
-//   список. Кеш-ключ поднят до v3 — у кого в кеше лежал proxy-URL,
-//   мгновенно переразрешают происхождение заново.
+// v188 (2026-09-25): СВОЙ ЧИСТЫЙ ДОМЕН. filmotiv.duckdns.org (A → 76.76.21.21)
+//   добавлен ПЕРВЫМ в цепочку ротации: кастом-домены Vercel обслуживаются с
+//   ДРУГОГО пула IP (76.76.21.x), который ТСПУ сейчас не режет — в отличие от
+//   ротационного anycast-пула *.vercel.app (IP-лотерея, диагноз Genopoisk
+//   v181/v182). Кеш-ключ поднят до v3 — старое «залипшее» происхождение
+//   сбрасывается у всех. domain-migrate.js мягко переводит входные страницы
+//   vercel.app → duckdns; плеер через edgeUrl() тоже получает чистый домен.
 (function() {
   'use strict';
 
   var VERCEL = 'https://filmotiv.vercel.app';
+  var DUCKDNS = 'https://filmotiv.duckdns.org';                          // v188: чистый пул 76.76.21.21
   var PROJECT = 'https://filmotiv-genocide12s-projects.vercel.app';      // стабильный: последний prod
   var BRANCH = 'https://filmotiv-git-main-genocide12s-projects.vercel.app'; // стабильный: ветка main
   var BACKUP = 'https://filmotiv-5sp8sjewa-genocide12s-projects.vercel.app'; // per-deployment (устаревает)
@@ -70,12 +70,11 @@
     try { localStorage.setItem(LS_KEY, JSON.stringify({ origin: o, ts: Date.now() })); } catch (_) {}
   }
 
-  // Список кандидатов — ТОЛЬКО собственные хосты Filmotiv. На vercel-хостах
-  // '' (same-origin) всегда первым. Свой чистый домен у Filmotiv (когда
-  // появится) встанет сюда же первым — без изменения механики.
+  // Список кандидатов. На vercel-хостах '' (same-origin) всегда первый,
+  // далее v188 DUCKDNS (чистый пул) — и только потом верcel-хосты.
   function origins() {
-    var list = isVercelHost() ? ['', VERCEL, PROJECT, BRANCH, BACKUP]
-                              : [VERCEL, PROJECT, BRANCH, BACKUP];
+    var list = isVercelHost() ? ['', DUCKDNS, VERCEL, PROJECT, BRANCH, BACKUP]
+                              : [DUCKDNS, VERCEL, PROJECT, BRANCH, BACKUP];
     var c = cachedOrigin();
     if (c && c !== '') {
       var i = list.indexOf(c);
@@ -90,7 +89,7 @@
   async function apiFetch(path, opts, timeoutMs) {
     opts = opts || {};
     var list = origins();
-    var maxTries = Math.min(list.length, 5);
+    var maxTries = Math.min(list.length, 6);
     var lastStatus = 0;
     for (var a = 0; a < maxTries; a++) {
       var o = list[a];
@@ -118,11 +117,11 @@
   }
 
   // Абсолютный URL для sendBeacon (не ждёт ответа, ротация невозможна —
-  // берём залипшее происхождение или первое из списка).
+  // берём залипшее происхождение или первое доступное).
   function beaconUrl(path) {
     if (isVercelHost()) return path;
     var c = cachedOrigin();
-    return (c && c !== '' ? c : VERCEL) + path;
+    return (c && c !== '' ? c : DUCKDNS) + path;
   }
 
   // Абсолютный URL для Edge-прокси плеера (/api/embed-edge, /api/media/...).
@@ -184,6 +183,7 @@
 
   window.FilmotivAPIOrigin = {
     VERCEL: VERCEL,
+    DUCKDNS: DUCKDNS,
     PROJECT: PROJECT,
     BRANCH: BRANCH,
     BACKUP: BACKUP,
