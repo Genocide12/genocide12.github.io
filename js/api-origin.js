@@ -79,7 +79,14 @@
     var c = cachedOrigin();
     if (c && c !== '') {
       var i = list.indexOf(c);
-      if (i > 0) { list.splice(i, 1); list.unshift(c); }
+      if (i > 0) {
+        list.splice(i, 1);
+        // На зеркале DUCKPROXY всегда первый: чистый пул 76.76.21.21
+        // стабильнее «недавнего» кеша vercel-хоста, чей IP мог уйти
+        // в блок-лист после ротации DNS. Кеш — вторым.
+        var at = (!isVercelHost() && list[0] === DUCKPROXY) ? 1 : 0;
+        list.splice(at, 0, c);
+      }
     }
     return list;
   }
