@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, maximum-scale=1, minimum-scale=1">
+  <meta name="theme-color" content="#04050d">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Filmotiv">
+
+  <!-- SEO Meta Tags -->
+  <title>Filmotiv — Смотреть фильмы онлайн бесплатно в хорошем качестве</title>
+  <meta name="description" content="Filmotiv. Смотрите фильмы онлайн в хорошем качестве. Каталог лучших фильмов: популярные, топ-250, новинки. Поиск фильмов, рейтинги, отзывы. Без рекламы.">
+  <meta name="author" content="Filmotiv">
+  <meta name="robots" content="index, follow">
+  <meta name="language" content="Russian">
+  <meta name="revisit-after" content="1 day">
+
+  <!-- Search Engine Verification -->
+  <meta name="yandex-verification" content="317d9c9354b69802" />
+  <meta name="google-site-verification" content="Yd6LYUl97HtqaAmwgFf7BJIauzpoOLVc1epesFXZ890" />
+
+  <!-- Open Graph / Social Media -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Filmotiv — Смотреть фильмы онлайн бесплатно">
+  <meta property="og:description" content="Filmotiv. Каталог лучших фильмов: популярные, топ-250, новинки. Поиск фильмов, рейтинги. Без рекламы.">
+  <meta property="og:url" content="https://filmotiv.vercel.app/">
+  <meta property="og:image" content="https://filmotiv.vercel.app/icon-512.png">
+  <meta property="og:site_name" content="Filmotiv">
+  <meta property="og:locale" content="ru_RU">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Filmotiv — Смотреть фильмы онлайн">
+  <meta name="twitter:description" content="Filmotiv. Каталог лучших фильмов, рейтинги, поиск.">
+  <meta name="twitter:image" content="https://filmotiv.vercel.app/icon-512.png">
+
+  <link rel="manifest" href="/fm/manifest.json">
+  <link rel="apple-touch-icon" href="/fm/icon-192.png">
+  <link rel="icon" type="image/png" href="/fm/icon-192.png">
+  <link rel="shortcut icon" type="image/png" href="/fm/icon-192.png">
+  <link rel="preconnect" href="https://filmotiv.vercel.app">
+  <link rel="dns-prefetch" href="https://filmotiv.vercel.app">
+  <link rel="canonical" href="https://filmotiv.vercel.app/">
+  <script defer src="/fm/i18n.js"></script>
+  <script src="/fm/js/api-origin.js?v=189"></script>
+  <script src="/fm/js/domain-migrate.js?v=189"></script>
+  <script defer src="/fm/js/error-handler.js?v=187"></script>
+  <script>
+    // ALWAYS attempt to load telegram-web-app.js — but only AFTER the window
+    // load event. Two reasons:
+    // 1) Detection: the old UA-gate (load only when UA contains "Telegram")
+    //    broke Mini App detection — Android/Desktop Mini App webviews often
+    //    have a plain WebView UA WITHOUT any "Telegram" token. Inside a real
+    //    Telegram client the request to this URL is intercepted and served
+    //    locally (fast, no network dependency). In a regular browser the
+    //    script reports platform 'unknown' and empty initData — detection
+    //    then correctly says "not in Telegram".
+    // 2) Spinner: a <script> inserted while the document is still loading
+    //    DELAYS the window load event. With telegram.org unreachable
+    //    (ERR_CONNECTION_TIMED_OUT after ~20s on desktop) the tab spinner
+    //    kept spinning ~20s although the page itself rendered instantly.
+    //    Inserted after the load event, the request no longer affects the
+    //    page's loading state at all.
+    (function() {
+      var loaded = false;
+      function insertTgScript() {
+        if (window.Telegram && window.Telegram.WebApp) return; // already injected
+        var s = document.createElement('script');
+        s.async = true;
+        s.src = 'https://telegram.org/js/telegram-web-app.js';
+        s.onload = function() {
+          loaded = true;
+          try {
+            // Notify app.js (it registers a listener for this event; a 6s poll
+            // there also covers the rare case of the event firing too early).
+            document.dispatchEvent(new CustomEvent('tg-webapp-loaded'));
+            // Fast path: hide the "Open in Telegram" banner right away when we
+            // are really inside Telegram — don't wait for app.js init.
+            var t = window.Telegram && window.Telegram.WebApp;
+            if (t && (t.initData || (t.platform && t.platform !== 'unknown'))) {
+              var btn = document.getElementById('fixedTelegramBtn');
+              if (btn) btn.style.display = 'none';
+            }
+          } catch (_) {}
+        };
+        s.onerror = function() { console.log('[tg] telegram-web-app.js unavailable'); };
+        document.head.appendChild(s);
+        // Abort after 4s if not loaded — browser will drop the connection
+        setTimeout(function() {
+          if (!loaded && s.parentNode) {
+            s.parentNode.removeChild(s);
+            console.log('[tg] telegram-web-app.js load aborted (timeout)');
+          }
+        }, 4000);
+      }
+      if (document.readyState === 'complete') insertTgScript();
+      else window.addEventListener('load', insertTgScript, { once: true });
+    })();
+  </script>
+  <link rel="stylesheet" href="/fm/css/app.css?v=187">
+  <link rel="stylesheet" href="/fm/css/cyber.css?v=187">
+  <!-- Structured Data for Search Engines (JSON-LD) -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "Filmotiv",
+    "alternateName": "Фильмотив",
+    "url": "https://filmotiv.vercel.app/",
+    "description": "Filmotiv. Смотрите фильмы онлайн в хорошем качестве. Каталог лучших фильмов: популярные, топ-250, новинки.",
+    "potentialAction": {
+      "@type": "SearchAction",
+      "target": "https://filmotiv.vercel.app/?q={search_term_string}",
+      "query-input": "required name=search_term_string"
+    }
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "Filmotiv",
+    "url": "https://filmotiv.vercel.app/",
+    "logo": "https://filmotiv.vercel.app/icon-512.png",
+    "sameAs": ["https://t.me/Filmotivbot"]
+  }
+  </script>
+</head>
+<body>
+  <!-- Living background — неоновое свечение кибер-города -->
+  <div class="background" aria-hidden="true">
+    <div class="orb one"></div>
+    <div class="orb two"></div>
+    <div class="orb three"></div>
+  </div>
+  <!-- Noscript content for search engine crawlers -->
+  <noscript>
+    <h1>Filmotiv — Смотреть фильмы онлайн бесплатно в хорошем качестве</h1>
+    <p>Filmotiv (Фильмотив) — бесплатный онлайн-сервис. Смотрите кино онлайн бесплатно, фильмы в хорошем качестве HD 1080, без рекламы и без регистрации.</p>
+
+    <h2>Смотреть фильмы онлайн</h2>
+    <p>На Filmotiv вы можете смотреть фильмы онлайн бесплатно в хорошем качестве. Каталог включает: популярные фильмы, топ-250 лучших фильмов по версии Кинопоиска, новинки кино 2026 года, случайный фильм на вечер.</p>
+
+    <h2>Категории фильмов</h2>
+    <ul>
+      <li>Популярные фильмы — самые просматриваемые фильмы прямо сейчас</li>
+      <li>Топ 250 — лучшие фильмы всех времён по рейтингу Кинопоиска</li>
+      <li>Новинки — свежие премьеры и новые фильмы, подборка обновляется каждый четверг</li>
+      <li>Случайный фильм — не знаете что посмотреть? Выберем за вас!</li>
+      <li>Коллекция — ваши любимые фильмы в одном месте</li>
+    </ul>
+
+    <h2>Жанры фильмов</h2>
+    <p>Драма, комедия, триллер, фантастика, боевик, ужасы, детектив, приключения, мелодрама, исторический, военный, криминал, биография, спорт, мюзикл, вестерн, артхаус, короткометражки, документальные фильмы, мультфильмы, аниме, сериалы.</p>
+
+    <h2>Популярные фильмы на Filmotiv</h2>
+    <p>Интерстеллар, Побег из Шоушенка, Зелёная миля, Крёстный отец, Тёмный рыцарь, Начало, Гладиатор, Аватар, Властелин колец, Звёздные войны, Матрица, Титаник, Форрест Гамп, Леон, Бойцовский клуб, Молчание ягнят, Пианист, Жизнь прекрасна, Список Шиндлера, Хорошо быть тихоней.</p>
+
+    <h2>Русские и зарубежные фильмы</h2>
+    <p>Смотрите русские фильмы, советские фильмы, зарубежные фильмы, европейское кино, азиатское кино, американские фильмы, британские фильмы. Фильмы с субтитрами и в оригинале.</p>
+
+    <h2>Фильмы на любом устройстве</h2>
+    <p>Смотрите фильмы на телефоне, фильмы на айфоне, фильмы на андроид, фильмы на компьютере, фильмы на телевизоре Smart TV, фильмы на проекторе. Приложение работает в Telegram Mini App — открывается одним нажатием.</p>
+
+    <h2>Поиск фильмов</h2>
+    <p>Введите @Filmotivbot и название фильма в любом чате Telegram для быстрого поиска. Рейтинг Кинопоиска, жанры, описания, постеры — всё в одном сообщении.</p>
+
+    <h2>Бесплатные фильмы без рекламы</h2>
+    <p>Filmotiv — это бесплатные фильмы онлайн без рекламы. Смотрите кино в хорошем качестве бесплатно. Фильмы HD 1080. Стриминг фильмов без VPN. Фильмы в любом месте.</p>
+
+    <p><a href="https://t.me/Filmotivbot">Открыть бота @Filmotivbot в Telegram</a></p>
+    <p><a href="https://filmotiv.vercel.app/">Открыть сайт Filmotiv</a></p>
+  </noscript>
+
+  <div class="cyber-shell">
+
+    <!-- ================= САЙДБАР (неон, по макету GENOPOISK) ================= -->
+    <aside class="gp-aside" id="gpAside" aria-label="Основное меню">
+      <div class="gp-aside-inner">
+        <div class="gp-brand">
+          <div class="pm-logo" id="cyberLogo" title="Filmotiv — на главную"><span class="brand-fill">Filmotiv</span></div>
+          <div class="gp-tagline">Кинотеатр в&nbsp;твоём кармане</div>
+        </div>
+        <nav class="cyber-nav" id="cyberNav" aria-label="Основная навигация">
+          <button class="cyber-nav-item active" data-nav="home" type="button"><span class="cyber-nav-ico"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h5v-6h4v6h5V9.5"/></svg></span>Главная</button>
+          <button class="cyber-nav-item" data-cat="films" type="button"><span class="cyber-nav-ico"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="3"/><path d="M3 10h18"/><path d="M7 7l2-3M12 7l2-3M17 7l2-3"/></svg></span>Фильмы</button>
+          <button class="cyber-nav-item" data-nav="series" type="button"><span class="cyber-nav-ico"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="12" rx="3"/><path d="M8 3l4 3 4-3"/></svg></span>Сериалы</button>
+          <button class="cyber-nav-item" data-cat="new" type="button"><span class="cyber-nav-ico"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 2l1.8 4.6L18 4.4l-1 4.9 4.9 1.4-3.5 3.5 3.5 3.5-4.9 1.4 1 4.9-4.2-2.2L12 22l-1.8-4.6L6 19.6l1-4.9L2.1 13.3l3.5-3.5L2.1 6.3 7 4.9 6 0z" transform="scale(.92) translate(1 1.4)"/></svg></span>Новинки</button>
+          <button class="cyber-nav-item" data-cat="popular" type="button"><span class="cyber-nav-ico"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 2c1.2 3.4-2.1 4.6-2.1 7.4 0 1.6 1 2.7 2.1 2.7s2.1-1.1 2.1-2.7c0-.6-.1-1.1-.3-1.6 2.2 1.5 3.7 3.9 3.7 6.4A5.5 5.5 0 0 1 6.5 14c0-5.4 4.4-7.6 5.5-12z"/></svg></span>Популярное</button>
+          <button class="cyber-nav-item" data-cat="top250" type="button"><span class="cyber-nav-ico"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 3l2.7 5.6 6.1.8-4.5 4.3 1.1 6.1L12 16.9l-5.4 2.9 1.1-6.1L3.2 9.4l6.1-.8z"/></svg></span>Топ 250</button>
+          <button class="cyber-nav-item" data-cat="favorites" type="button"><span class="cyber-nav-ico"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 20s-7.5-4.9-7.5-10A4.2 4.2 0 0 1 12 7.4 4.2 4.2 0 0 1 19.5 10c0 5.1-7.5 10-7.5 10z"/></svg></span>Коллекция</button>
+        </nav>
+        <div class="gp-aside-art" aria-hidden="true">
+          <div class="gp-aside-quote">«Кино — жизнь, из которой вырезали скучные сцены»</div>
+          <div class="gp-aside-city"></div>
+        </div>
+      </div>
+    </aside>
+    <div class="gp-backdrop" id="gpBackdrop" aria-hidden="true"></div>
+
+    <!-- ================= ЦЕНТРАЛЬНАЯ КОЛОНКА ================= -->
+    <div class="gp-center">
+
+      <header class="pm-header">
+        <div class="pm-header-inner">
+          <button class="gp-burger" id="gpBurger" type="button" aria-label="Открыть меню"><span></span><span></span><span></span></button>
+          <div class="pm-logo gp-logo-mobile" id="cyberLogoM" title="Filmotiv — на главную"><span class="brand-fill">Filmotiv</span></div>
+          <div class="search-wrapper pm-search">
+            <div class="search-container">
+              <span class="search-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.2-3.2"/></svg>
+              </span>
+              <input type="text" id="searchInput" class="search-input" placeholder="Поиск фильмов, сериалов, актеров..." autocomplete="off" enterkeyhint="done" inputmode="search" />
+              <span class="gp-kbd" aria-hidden="true">⌘K</span>
+              <button class="search-clear" id="searchClear" type="button" title="Очистить">✕</button>
+            </div>
+          </div>
+        </div>
+        <!-- чипы-категории (мобайл-скролл) -->
+        <div class="pm-chips-row" aria-label="Быстрые категории">
+          <button class="pm-chip" data-cat="popular" type="button"><span class="pm-chip-ico"><svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M12 2c1.2 3.4-2.1 4.6-2.1 7.4 0 1.6 1 2.7 2.1 2.7s2.1-1.1 2.1-2.7c0-.6-.1-1.1-.3-1.6 2.2 1.5 3.7 3.9 3.7 6.4A5.5 5.5 0 0 1 6.5 14c0-5.4 4.4-7.6 5.5-12z"/></svg></span>Популярные</button>
+          <button class="pm-chip" data-cat="top250" type="button"><span class="pm-chip-ico"><svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M12 2l2.9 6.2 6.6.8-4.9 4.6 1.3 6.6L12 17l-5.9 3.2 1.3-6.6L2.5 9l6.6-.8L12 2z"/></svg></span>Топ 250</button>
+          <button class="pm-chip" data-cat="new" type="button"><span class="pm-chip-ico"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M3 10h18"/></svg></span>Новинки</button>
+          <button class="pm-chip" data-cat="random" type="button"><span class="pm-chip-ico"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="4"/><circle cx="9" cy="9" r="1.3" fill="currentColor" stroke="none"/><circle cx="15" cy="15" r="1.3" fill="currentColor" stroke="none"/><circle cx="15" cy="9" r="1.3" fill="currentColor" stroke="none"/><circle cx="9" cy="15" r="1.3" fill="currentColor" stroke="none"/></svg></span>Случайный</button>
+          <button class="pm-chip" data-cat="favorites" type="button"><span class="pm-chip-ico"><svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M12 21s-8-5.3-8-11a4.6 4.6 0 0 1 8-3 4.6 4.6 0 0 1 8 3c0 5.7-8 11-8 11z"/></svg></span>Коллекция</button>
+          <button class="pm-chip" data-action="genres" type="button"><span class="pm-chip-ico"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg></span>Жанры</button>
+        </div>
+      </header>
+
+      <div class="cyber-main">
+      <main class="app">
+      <div class="container">
+        <div class="hero pm-hide">
+          <div class="hero-top">
+            <div class="adhd-eyebrow">Cinema OS · Online</div>
+            <h1 class="hero-title" id="heroTitle"><span id="premiumBadge" class="premium-badge" style="display:none;">🔥</span>Filmotiv 🎬</h1>
+            <p class="hero-subtitle" id="heroSubtitle" style="display:none;"></p>
+          </div>
+          <button class="hero-scroll-top" id="heroScrollTop" type="button" aria-label="Наверх" title="Наверх">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 4 L4 14 L9 14 L9 20 L15 20 L15 14 L20 14 Z"/></svg>
+          </button>
+        </div>
+
+        <!-- КИБЕР-БАННЕР «Смотрят онлайн»: надпись и фильмы — внутри блока
+             cyber-hero (карусель топ-100 Кинопоиска, заполняет cyber.js) -->
+        <div class="cyber-hero" id="cyberHero" hidden aria-label="Смотрят онлайн"></div>
+
+        <!-- СЕКЦИИ ГЛАВНОЙ (заполняет cyber.js) -->
+        <div class="cyber-sections" id="cyberSections" hidden>
+          <div class="cyber-section">
+            <div class="cyber-section-head">
+              <div class="cyber-section-title">Жанры</div>
+            </div>
+            <div class="cyber-chips" id="cyberChips"></div>
+          </div>
+          <div class="cyber-section">
+            <div class="cyber-section-head">
+              <div class="cyber-section-title">🏆 Топ рейтинга</div>
+              <button class="cyber-section-all" data-cat="top250" type="button">Все</button>
+            </div>
+            <div class="cyber-row" id="pmTopRow"></div>
+          </div>
+        </div>
+
+        <button class="cyber-backbar" id="cyberBack" type="button">← На главную</button>
+        <div class="content hidden" id="content">
+          <div class="loader" id="loader">
+            <div class="fx-cube-loader">
+              <span></span><span></span><span></span><span></span>
+            </div>
+            <div class="loader-text">Загрузка...</div>
+          </div>
+          <div class="film-grid" id="filmGrid"></div>
+          <button class="cyber-more" id="loadMoreBtn" type="button" hidden>Показать ещё</button>
+        </div>
+      </div>
+      </main>
+      </div>
+    </div>
+
+    <!-- ================= ПРАВАЯ ПАНЕЛЬ (неон, по макету) ================= -->
+    <aside class="cyber-rail" aria-label="Панель просмотра">
+      <div class="cyber-rail-card">
+        <div class="cyber-rail-title"><span>Последние фильмы</span></div>
+        <div class="gp-recent" id="railRecent"></div>
+        <div class="cyber-empty" id="railRecentEmpty">Откройте фильм — он появится здесь 🎬</div>
+      </div>
+      <div class="cyber-rail-card gp-quote-card" aria-hidden="true">
+        <div class="gp-quote-text">«Лучше плохой фильм, чем никакого»</div>
+        <div class="gp-quote-art"></div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- ================= ФУТЕР ================= -->
+  <footer class="pm-footer">
+    <div class="pm-footer-inner">
+      <div class="pm-footer-brand">
+        <div class="pm-footer-logo"><span class="brand-fill">Filmotiv</span></div>
+      </div>
+      <nav class="pm-footer-links" aria-label="Ссылки">
+        <a href="/fm/privacy.html">Политика конфиденциальности</a>
+        <a href="/fm/terms.html">Пользовательское соглашение</a>
+      </nav>
+      <a class="pm-tg-btn" href="https://t.me/Filmotivbot?start=app" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24"><path d="M9.04 15.31l-.38 5.35c.54 0 .78-.23 1.06-.51l2.55-2.44 5.28 3.87c.97.54 1.66.26 1.92-.89L22.9 3.4c.31-1.43-.51-1.99-1.46-1.64L2.9 9.02c-1.39.54-1.37 1.32-.24 1.67l4.69 1.46L18.3 5.2c.51-.34.98-.15.6.19L9.04 15.31z"/></svg>
+        Доступно в Telegram
+      </a>
+    </div>
+  </footer>
+
+  <!-- Cookie consent banner (shown once, dismissible) -->
+  <div id="cookieConsent" class="adhd-cookie" style="display:none;">
+    <div class="adhd-cookie-inner">
+      <div class="adhd-cookie-text">
+        Мы используем cookie для авторизации и сохранения ваших предпочтений. Продолжая, вы соглашаетесь с <a href="/fm/privacy.html">политикой конфиденциальности</a>.
+      </div>
+      <button id="cookieAccept" class="adhd-cookie-btn">Принять</button>
+    </div>
+  </div>
+  <script>
+    (function() {
+      try {
+        if (!localStorage.getItem('filmotiv_cookie_consent')) {
+          var banner = document.getElementById('cookieConsent');
+          if (banner) banner.style.display = 'block';
+          var btn = document.getElementById('cookieAccept');
+          if (btn) btn.onclick = function() {
+            localStorage.setItem('filmotiv_cookie_consent', '1');
+            if (banner) banner.style.display = 'none';
+          };
+        }
+      } catch(_) {}
+    })();
+  </script>
+  <!-- Copy protection: block context menu, drag, copy, select on entire page -->
+  <script>
+  (function() {
+    // Block right-click context menu everywhere.
+    document.addEventListener('contextmenu', function(e) { e.preventDefault(); return false; });
+    // Block drag of images and other elements.
+    document.addEventListener('dragstart', function(e) { e.preventDefault(); return false; });
+    // Block copy/cut/paste on the page.
+    document.addEventListener('copy', function(e) { e.preventDefault(); return false; });
+    document.addEventListener('cut', function(e) { e.preventDefault(); return false; });
+    // Block iOS long-press on images (Save Image / Copy menu).
+    document.addEventListener('touchstart', function(e) {
+      if (e.target && e.target.tagName === 'IMG') {
+        e.target.style.webkitTouchCallout = 'none';
+      }
+    }, { passive: true });
+  })();
+  </script>
+  <!-- Fixed "Open in Telegram" button — only on browser (NOT in Mini App) -->
+  <a href="https://t.me/Filmotivbot?start=app" target="_blank" rel="noopener" id="fixedTelegramBtn">
+    <span id="fixedTelegramText">🚀 Открыть в Telegram</span>
+  </a>
+  <script>
+    // Hide "Open in Telegram" button if running inside Telegram Mini App.
+    // User is already in Telegram — no need to show this button.
+    // Check multiple signals: Telegram.WebApp object, UA string, URL params.
+    (function() {
+      try {
+        var t = window.Telegram && window.Telegram.WebApp;
+        var ua = navigator.userAgent || '';
+        var inTelegram = false;
+        if (t && (t.initData || (t.platform && t.platform !== 'unknown'))) {
+          inTelegram = true;
+        }
+        // Fallback: check UA for Telegram (works even if script not loaded yet)
+        if (ua.indexOf('Telegram') !== -1 || ua.indexOf('telegram') !== -1) {
+          inTelegram = true;
+        }
+        if (inTelegram) {
+          var btn = document.getElementById('fixedTelegramBtn');
+          if (btn) btn.style.display = 'none';
+          // Marks Mini App mode for CSS: drops the extra 120px bottom gap
+          // reserved for the fixed button in the browser.
+          document.body.classList.add('in-tg');
+        }
+      } catch(_) {}
+    })();
+  </script>
+  <!-- Long-press film info popup (mobile only — desktop uses :hover) -->
+  <div class="film-info-overlay" id="filmInfoOverlay">
+    <div class="film-info-popup" id="filmInfoPopup">
+      <img class="fip-poster" id="fipPoster" src="" alt="">
+      <div class="fip-title" id="fipTitle"></div>
+      <div class="fip-meta" id="fipMeta"></div>
+      <div class="fip-actions">
+        <button class="fip-btn fip-btn-secondary" id="fipClose" data-i18n="filmInfoClose">Закрыть</button>
+        <button class="fip-btn fip-btn-primary" id="fipOpen" data-i18n="filmInfoWatch">▶ Смотреть</button>
+      </div>
+    </div>
+  </div>
+  <!-- ADHD OS micro-interactions (confetti, toasts, haptics) -->
+  <script defer src="/fm/js/adhd-os.js?v=187"></script>
+  <!-- All JS bundled into one file (core + device + auth + ui + movies + tracking + app) -->
+  <script defer src="/fm/js/app.js?v=188"></script>
+  <!-- Neon dashboard: сайдбар, герой, секции, жанры, рейл, режим поиска -->
+  <script defer src="/fm/js/cyber.js?v=187"></script>
+</body>
+</html>

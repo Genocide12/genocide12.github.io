@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /debug-index.html
+Disallow: /debug-player.html
+Disallow: /*?tgWebAppData=
+Disallow: /*#tgWebAppData=
+
+Sitemap: https://filmotiv.vercel.app/sitemap.xml
+Host: https://filmotiv.vercel.app

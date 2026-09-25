@@ -29,10 +29,12 @@
   try { host = window.location.hostname || ''; } catch (e) { return; }
 
   var isVercelProd = host === 'filmotiv.vercel.app';
-  var isMirror = host === 'genocide12.github.io';
 
-  // preview-деплои (случайные имена), duckdns и локальные — не трогаем.
-  if (!isVercelProd && !isMirror) return;
+  // v192-fm: зеркало GitHub Pages — ОТДЕЛЬНЫЙ САЙТ (решение владельца):
+  // никакой авто-переадресации с genocide12.github.io/fm/ на duckdns.
+  // Миграция работает только на filmotiv.vercel.app (старые закладки).
+  // preview-деплои, duckdns, github.io и локальные — не трогаем.
+  if (!isVercelProd) return;
 
   // Не переадресуем, если пользователь пришёл с явным намерением остаться.
   try {
@@ -41,7 +43,7 @@
 
   // Максимум один раз за сессию (отдельный guard для зеркала и для vercel):
   // если цель окажется нестабильной, пинг-понг хуже, чем остаться на месте.
-  var guardKey = isMirror ? 'fm_migrated_mirror' : 'fm_migrated_once';
+  var guardKey = 'fm_migrated_once';
   try {
     if (sessionStorage.getItem(guardKey)) return;
     sessionStorage.setItem(guardKey, '1');

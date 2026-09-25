@@ -1,31 +1,31 @@
-// Filmotiv Service Worker v189 (v189: mirror→duckdns auto + watchRedirect duckdns-first)
+// Filmotiv Service Worker v192-fm (GitHub Pages /fm/ scope; зеркало = отдельный сайт, без авто-увода)
 // SIMPLIFIED — does NOT intercept navigation requests.
 // Only caches static assets (JS/CSS/images) for offline.
 // HTML pages go directly to network — no SW interference.
 
-const CACHE_NAME = 'filmotiv-v189';
+const CACHE_NAME = 'filmotiv-v192-fm';
 const STATIC_ASSETS = [
-  '/css/app.css',
-  '/css/cyber.css',
-  '/js/api-origin.js',
-  '/js/domain-migrate.js',
-  '/js/app.js',
-  '/js/cyber.js',
-  '/js/error-handler.js',
-  '/js/adhd-os.js',
-  '/i18n.js',
-  '/bridge.js',
-  '/manifest.json',
-  '/icon-192.png',
-  '/icon-512.png',
-  '/icon-maskable-192.png',
-  '/icon-maskable-512.png',
-  '/apple-touch-icon.png',
-  '/favicon.ico',
-  '/offline.html',
-  '/fonts/oswald-cyrillic.woff2',
-  '/fonts/oswald-latin.woff2',
-  '/img/animated-text-fill.png'
+  '/fm/css/app.css',
+  '/fm/css/cyber.css',
+  '/fm/js/api-origin.js',
+  '/fm/js/domain-migrate.js',
+  '/fm/js/app.js',
+  '/fm/js/cyber.js',
+  '/fm/js/error-handler.js',
+  '/fm/js/adhd-os.js',
+  '/fm/i18n.js',
+  '/fm/bridge.js',
+  '/fm/manifest.json',
+  '/fm/icon-192.png',
+  '/fm/icon-512.png',
+  '/fm/icon-maskable-192.png',
+  '/fm/icon-maskable-512.png',
+  '/fm/apple-touch-icon.png',
+  '/fm/favicon.ico',
+  '/fm/offline.html',
+  '/fm/fonts/oswald-cyrillic.woff2',
+  '/fm/fonts/oswald-latin.woff2',
+  '/fm/img/animated-text-fill.png'
 ];
 
 self.addEventListener('install', function(event) {
@@ -68,7 +68,7 @@ self.addEventListener('fetch', function(event) {
   if (req.mode === 'navigate' || req.destination === 'document') return;
 
   // SKIP player.html
-  if (url.pathname === '/player.html') return;
+  if (url.pathname === '/fm/player.html') return;
 
   // ONLY cache static assets (JS/CSS/images/fonts)
   // Cache-first with background update

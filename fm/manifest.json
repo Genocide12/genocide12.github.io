@@ -2,37 +2,43 @@
   "name": "Filmotiv",
   "short_name": "Filmotiv",
   "description": "Смотри фильмы в хорошем качестве - каталог лучших фильмов",
-  "start_url": "/?source=pwa",
-  "scope": "/",
+  "start_url": "/fm/?source=pwa",
+  "scope": "/fm/",
   "display": "standalone",
-  "display_override": ["standalone", "browser"],
+  "display_override": [
+    "standalone",
+    "browser"
+  ],
   "background_color": "#08080d",
   "theme_color": "#8b5cf6",
   "orientation": "portrait-primary",
   "dir": "ltr",
   "lang": "ru",
-  "categories": ["entertainment", "movies"],
+  "categories": [
+    "entertainment",
+    "movies"
+  ],
   "icons": [
     {
-      "src": "/icon-192.png",
+      "src": "/fm/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/icon-maskable-192.png",
+      "src": "/fm/icon-maskable-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "maskable"
     },
     {
-      "src": "/icon-512.png",
+      "src": "/fm/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/icon-maskable-512.png",
+      "src": "/fm/icon-maskable-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"

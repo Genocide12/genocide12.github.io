@@ -1878,7 +1878,7 @@
     window.addEventListener('load', function() {
       // Register SW only ONCE per session — don't unregister on every load
       // (was causing infinite reload loop on bad internet)
-      navigator.serviceWorker.register('/sw.js', { scope: '/' }).then(function(reg) {
+      navigator.serviceWorker.register('/fm/sw.js', { scope: '/fm/' }).then(function(reg) {
         console.log('[sw] registered, scope:', reg.scope);
         // Check for updates every 10 min — but DON'T auto-reload on
         // controllerchange. New SW will activate on next manual page load.
