@@ -32,9 +32,18 @@
 //      Оба добавлены в цепочку ротации перед per-deployment BACKUP.
 //      Техническое ограничение: если ХОСТ полностью заблокирован (страница
 //      вообще не открылась), JS не выполнится — тут помогает только зеркало.
+// v188 (2026-09-25): добавлен DUCKPROXY — edge-прокси проекта Genopoisk
+//   https://genopoisk.duckdns.org/fm/* → filmotiv.vercel.app/*
+//   (rewrite в vercel.json Genopoisk, коммит 377c28a). Кастомный домен
+//   обслуживается с ЧИСТОГО пула IP 76.76.21.21, который ТСПУ не режет
+//   (тогда как весь *.vercel.app — IP-лотерея). Теперь ПЕРВЫЙ кандидат
+//   ротации на зеркале: лента/поиск/me/track стабильны из РФ. edgeUrl()
+//   плеера прокси ИСКЛЮЧАЕТ: embed-страница Filmotiv строит абсолютные
+//   пути от собственного origin — через /fm-префикс она бы ломалась.
 (function() {
   'use strict';
 
+  var DUCKPROXY = 'https://genopoisk.duckdns.org/fm'; // edge-прокси через чистый пул IP
   var VERCEL = 'https://filmotiv.vercel.app';
   var PROJECT = 'https://filmotiv-genocide12s-projects.vercel.app';      // стабильный: последний prod
   var BRANCH = 'https://filmotiv-git-main-genocide12s-projects.vercel.app'; // стабильный: ветка main
@@ -63,9 +72,10 @@
   }
 
   // Список кандидатов. На vercel-хостах '' (same-origin) всегда первый.
+  // На зеркале первым DUCKPROXY (чистый пул IP 76.76.21.21 — RU-стабилен).
   function origins() {
     var list = isVercelHost() ? ['', VERCEL, PROJECT, BRANCH, BACKUP]
-                              : [VERCEL, PROJECT, BRANCH, BACKUP];
+                              : [DUCKPROXY, VERCEL, PROJECT, BRANCH, BACKUP];
     var c = cachedOrigin();
     if (c && c !== '') {
       var i = list.indexOf(c);
@@ -108,11 +118,11 @@
   }
 
   // Абсолютный URL для sendBeacon (не ждёт ответа, ротация невозможна —
-  // берём залипшее происхождение или первое доступное).
+  // берём залипшее происхождение или DUCKPROXY как самый стабильный).
   function beaconUrl(path) {
     if (isVercelHost()) return path;
     var c = cachedOrigin();
-    return (c && c !== '' ? c : VERCEL) + path;
+    return (c && c !== '' ? c : DUCKPROXY) + path;
   }
 
   // Абсолютный URL для Edge-прокси плеера (/api/embed-edge, /api/media/...).
@@ -121,7 +131,10 @@
   // происхождение мертво, плеер уйдёт по цепочке дальше (семейство/FlixCDN).
   function edgeUrl(path) {
     if (isVercelHost()) return path;
-    var list = origins();
+    // Без прокси: embed-страница Filmotiv резолвит свои суб-ресурсы от
+    // собственного origin (location.host + /api/...), а через DUCKPROXY
+    // путь был бы /fm/api/... — внутренние запросы embed ушли бы мимо.
+    var list = origins().filter(function(o) { return o !== DUCKPROXY; });
     return (list[0] || VERCEL) + path;
   }
 
@@ -173,6 +186,7 @@
   }
 
   window.FilmotivAPIOrigin = {
+    DUCKPROXY: DUCKPROXY,
     VERCEL: VERCEL,
     PROJECT: PROJECT,
     BRANCH: BRANCH,
