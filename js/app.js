@@ -142,8 +142,25 @@
       try {
         var c = film && film.countries && film.countries[0] && film.countries[0].country;
         if (!c) return '';
-        var iso = App.CORE.COUNTRY_ISO[String(c).trim()] || App.CORE.COUNTRY_ISO[String(c).trim().replace(/ё/g, 'е')];
+        var s = String(c).trim();
+        // Страховка: если пришёл уже готовый ISO-код (us/US) — флаг напрямую,
+        // без справочника (запрос пользователя: флаг вместо текстового региона).
+        if (/^[a-zA-Z]{2}$/.test(s)) return App.CORE.isoToFlag(s);
+        var iso = App.CORE.COUNTRY_ISO[s] || App.CORE.COUNTRY_ISO[s.replace(/ё/g, 'е')];
         return App.CORE.isoToFlag(iso);
+      } catch (_) { return ''; }
+    },
+    // До N флагов стран производства через пробел (для мета-строк).
+    flagsOf: function(film, n) {
+      try {
+        var list = (film && film.countries) || [];
+        var k = Math.max(1, n || 1);
+        var out = [];
+        for (var i = 0; i < list.length && out.length < k; i++) {
+          var f = App.CORE.flagOf({ countries: [list[i]] });
+          if (f) out.push(f);
+        }
+        return out.join(' ');
       } catch (_) { return ''; }
     },
 
@@ -570,11 +587,8 @@
         if (film.genres && film.genres.length > 0) {
           genres = film.genres.slice(0, 3).map(function(g) { return g.genre; }).join(', ');
         }
-        // Country (first 1-2)
-        var countries = '';
-        if (film.countries && film.countries.length > 0) {
-          countries = film.countries.slice(0, 2).map(function(c) { return c.country; }).join(', ');
-        }
+        // Country: показывается ТОЛЬКО флагом после года (см. flagsOf ниже),
+        // текстовые названия стран на карточках убраны по запросу пользователя.
         // Film length
         var length = film.filmLength || '';
         if (length && !isNaN(Number(length))) {
@@ -624,13 +638,13 @@
 
         var info = document.createElement('div');
         info.className = 'film-info';
-        // Meta: год · флаг страны · страна · жанры · длина · рейтинг
-        // Флаг страны производства — сразу ПОСЛЕ года выпуска (запрос пользователя).
-        var flag = App.CORE.flagOf(film);
+        // Meta: год · флаги стран производства · жанры · длина · рейтинг
+        // Страна производства — ТОЛЬКО флагом, текст (США/us) убран
+        // (запрос пользователя). Флаг — сразу после года выпуска.
+        var flag = App.CORE.flagsOf(film, 2);
         var metaParts = [];
         if (year) metaParts.push('<span>' + year + '</span>');
         if (flag) metaParts.push('<span class="film-flag">' + flag + '</span>');
-        if (countries) metaParts.push('<span class="film-genres">' + countries + '</span>');
         if (genres) metaParts.push('<span class="film-genres">' + genres + '</span>');
         if (length) metaParts.push('<span class="film-genres">' + length + '</span>');
         var metaHtml = metaParts.join(' · ');

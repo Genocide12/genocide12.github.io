@@ -207,11 +207,11 @@
   function heroBuild(films) {
     var hero = $('cyberHero');
     if (!hero || !films || films.length === 0) return;
-    // v182: 10-20 фильмов в «Смотрят онлайн» (было 5). Берём до 16 —
-    // топ-100 Кинопоиска page=1 как раз даёт 20 кандидатов.
+    // v190: ровно 15 фильмов в «Смотрят онлайн» (было 16/10-20) — запрос владельца.
+    // Топ-100 Кинопоиска page=1 даёт с запасом.
     // Фоны грузим ЛЕНИВО: только активный слайд и соседние (heroLoadBg),
-    // иначе 16 больших постеров ломили бы сеть на мобильных.
-    heroFilms = films.filter(function(f) { return posterOf(f); }).slice(0, 16);
+    // иначе 15 больших постеров ломили бы сеть на мобильных.
+    heroFilms = films.filter(function(f) { return posterOf(f); }).slice(0, 15);
     if (heroFilms.length === 0) return;
     // Надпись «Смотрят онлайн» — ВНУТРИ блока cyber-hero (запрос пользователя),
     // с пульсирующим live-индикатором: фильмы — топ-100 Кинопоиска.
@@ -222,9 +222,13 @@
       var meta = [];
       var y = f.year || '';
       var gens = (f.genres || []).slice(0, 2).map(function(g) { return g.genre; }).join(', ');
+      // v190: регион производства — ФЛАГОМ страны, не текстом (запрос владельца).
+      // До двух флагов; если страна неизвестна справочнику — фолбэк на текст.
+      var flags = App.CORE.flagsOf ? App.CORE.flagsOf(f, 2) : '';
       var cts = (f.countries || []).slice(0, 2).map(function(c) { return c.country; }).join(', ');
+      var region = flags || cts;
       if (y) meta.push(esc(y));
-      if (cts) meta.push(esc(cts));
+      if (region) meta.push(esc(region));
       if (gens) meta.push(esc(gens));
       if (f.filmLength) meta.push(esc(f.filmLength) + ' мин');
       var r = ratingOf(f);
