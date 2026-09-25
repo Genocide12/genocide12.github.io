@@ -462,7 +462,9 @@
         if (tgNameFromUrl) localStorage.setItem('filmotiv_tg_user_name', tgNameFromUrl);
         if (tgUsernameFromUrl) localStorage.setItem('filmotiv_tg_username', tgUsernameFromUrl);
         localStorage.removeItem('filmotiv_user_id');
-        try { sessionStorage.setItem('filmotiv_just_logged_in', tgNameFromUrl || tgUsernameFromUrl || 'Telegram'); } catch (_) {}
+        // v196: флаг в localStorage (sessionStorage при reload+replaceState
+        // оказался ненадёжным — терялся, тост не показывался).
+        try { localStorage.setItem('filmotiv_just_logged_in', JSON.stringify({ name: tgNameFromUrl || tgUsernameFromUrl || 'Telegram', ts: Date.now() })); } catch (_) {}
         history.replaceState(null, '', window.location.pathname);
         window.location.reload();
       } else if (telegramLogin === 'error') {
@@ -493,9 +495,8 @@
         if (tgNameFromUrl) localStorage.setItem('filmotiv_tg_user_name', tgNameFromUrl);
         if (tgUsernameFromUrl) localStorage.setItem('filmotiv_tg_username', tgUsernameFromUrl);
         localStorage.removeItem('filmotiv_user_id');
-        // v195: тост успеха — теперь и для входа по ссылке из бота (?tg_id=),
-        // не только для OIDC (v194 ставил флаг только в success-ветке).
-        try { sessionStorage.setItem('filmotiv_just_logged_in', tgNameFromUrl || tgUsernameFromUrl || 'Telegram'); } catch (_) {}
+        // v196: тост успеха — теперь и для входа по ссылке из бота (?tg_id=).
+        try { localStorage.setItem('filmotiv_just_logged_in', JSON.stringify({ name: tgNameFromUrl || tgUsernameFromUrl || 'Telegram', ts: Date.now() })); } catch (_) {}
         history.replaceState(null, '', window.location.pathname);
         window.location.reload();
       }
@@ -1508,13 +1509,16 @@
   // ====== Handle OAuth redirect (if returning from Telegram login) ======
   App.AUTH.handleOAuthRedirect();
 
-  // v194: подтверждение успешного входа после перезагрузки (флаг ставит
-  // handleOAuthRedirect) — пользователь видит, что вход состоялся.
+  // v196: подтверждение успешного входа после перезагрузки (флаг в
+  // localStorage с меткой времени, годен 15с — ставят обе ветки входа).
   try {
-    var justLoggedIn = sessionStorage.getItem('filmotiv_just_logged_in');
-    if (justLoggedIn) {
-      sessionStorage.removeItem('filmotiv_just_logged_in');
-      if (App.UI && App.UI.showToast) App.UI.showToast('✅ Вы вошли как ' + justLoggedIn + ' — коллекция синхронизирована', 4500);
+    var justRaw = localStorage.getItem('filmotiv_just_logged_in');
+    if (justRaw) {
+      localStorage.removeItem('filmotiv_just_logged_in');
+      var justObj = JSON.parse(justRaw);
+      if (justObj && justObj.name && (Date.now() - (justObj.ts || 0)) < 15000 && App.UI && App.UI.showToast) {
+        App.UI.showToast('✅ Вы вошли как ' + justObj.name + ' — коллекция синхронизирована', 4500);
+      }
     }
   } catch (_) {}
 
