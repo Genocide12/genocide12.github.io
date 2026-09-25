@@ -4,14 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,maximum-scale=1,minimum-scale=1">
   <meta name="referrer" content="origin">
-  <link rel="icon" type="image/x-icon" href="/fm/favicon.ico">
-  <link rel="icon" type="image/png" sizes="192x192" href="/fm/icon-192.png">
-  <link rel="shortcut icon" type="image/x-icon" href="/fm/favicon.ico">
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+  <link rel="shortcut icon" type="image/x-icon" href="favicon.ico">
   <!-- Preconnect to player host for faster iframe load (~200ms saved) -->
   <link rel="preconnect" href="https://api.embess.ws" crossorigin>
   <link rel="dns-prefetch" href="https://api.embess.ws">
-  <script src="/fm/i18n.js"></script>
-  <script src="/fm/js/api-origin.js?v=189"></script>
+  <script src="i18n.js"></script>
+  <script src="js/api-origin.js?v=192"></script>
   <!-- Vercel Web Analytics убран из плеера (v184): EasyList/адблоки режут
        cdn.vercel-insights.com/v1/script.js → ERR_BLOCKED_BY_CLIENT в консоли -->
   <title>Плеер</title>
@@ -221,6 +221,15 @@
       pointer-events:none;
     }
     .toast.visible { display:block; }
+    /* v192: прозрачная подсказка по центру плеера — клики проходят насквозь */
+    .play-hint {
+      position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+      z-index:3; pointer-events:none; background:transparent;
+      color:rgba(255,255,255,.92); font:600 16px/1.45 system-ui,-apple-system,sans-serif;
+      text-shadow:0 1px 10px rgba(0,0,0,.85); text-align:center; max-width:84%;
+      opacity:0; transition:opacity .6s ease; padding:6px 12px;
+    }
+    .play-hint.visible { opacity:1; }
     .loading-overlay {
       position:absolute;
       inset:0;
@@ -373,7 +382,6 @@
   <div class="player-header" id="playerHeader">
     <span class="title" id="videoTitle">Загрузка...</span>
     <div class="btn-group">
-      <button class="btn btn-src" id="srcBtn" title="Сменить плеер: оригинальный ↔ резервный">⇄</button>
       <button class="btn btn-fav" id="favBtn" title="В избранное">❤</button>
       <button class="btn btn-close" id="closeBtn" title="Закрыть">✕</button>
     </div>
@@ -388,6 +396,9 @@
       </div>
     </div>
     <div class="toast" id="toast"></div>
+    <!-- v192: прозрачная подсказка по центру плеера; pointer-events:none —
+         клики проходят насквозь; показывается после загрузки страницы -->
+    <div class="play-hint" id="playHint">Нажмите play и значок</div>
     <!-- Rate film overlay — appears when film ends -->
     <div class="rate-overlay" id="rateOverlay">
       <div class="rate-card">
@@ -412,7 +423,6 @@
         <div class="pe-sub" id="peSub">Источник не вернул видео. Уже пробуем другие зеркала автоматически — обычно помогает за пару минут.</div>
         <div class="pe-btns">
           <button class="pe-btn pe-primary" id="peRetry">⟳ Ещё раз</button>
-          <button class="pe-btn" id="peAlt">⇄ Резервный плеер</button>
           <button class="pe-btn" id="peClose">✕ Закрыть</button>
         </div>
       </div>
@@ -428,8 +438,7 @@
         // КРЕСТИК ВСЕГДА закрывает плеер и возвращает на главную:
         // не history.back (плеер мог открыться напрямую/из Telegram),
         // а явный переход на корень текущего origin.
-        var home = '/';
-        try { home = new URL('/', location.href).href; } catch (_) {}
+        var home = 'index.html';
         try { window.location.replace(home); } catch (e) {
           try { window.location.href = home; } catch (_) {}
         }
@@ -768,10 +777,10 @@
         if (isFavorite) {
           favBtn.classList.remove('pop'); void favBtn.offsetWidth; favBtn.classList.add('pop');
           showFavBurst();
-          showToast('❤ Добавлено в коллекцию', 1800);
+          showToast('❤ Вы добавили фильм в избранное', 1800);
         } else {
           favBtn.classList.remove('unpop'); void favBtn.offsetWidth; favBtn.classList.add('unpop');
-          showToast('Убрано из коллекции', 1500);
+          showToast('Вы убрали фильм из избранного', 1500);
         }
         setTimeout(function() { favBtn.classList.remove('pop', 'unpop'); }, 600);
       } catch (e) {
@@ -946,15 +955,15 @@
     var __bridgePremium = false; // какой бридж сейчас в iframe
     var __bridgeArrived = false; // bridge_ready получен (srcdoc ИЛИ edge-iframe)
     var __metaArrived = false;   // метаданные видео получены (длительность > 0)
-    var __srcMode = 'original';  // 'original' | 'backup' — кнопка ⇄ в шапке
+    // v192: __srcMode и резервный плеер удалены по запросу владельца («старый
+    // заработал нормально») — осталась цепочка edge → семейство зеркал.
     (function() {
       window.addEventListener('message', function(e) {
         var d = e.data;
         if (typeof d === 'string') { try { d = JSON.parse(d); } catch (_) { return; } }
         if (!d || typeof d !== 'object') return;
         if (d.type === 'play' || (d.type === 'timeupdate' && d.currentTime > 0)) __playStarted = true;
-        if (d.type === 'flix_ready') onBackupReady();
-        if (d.type === 'flix_error') onBackupError(d.message);
+        // v192: flix_ready/flix_error убраны вместе с резервным плеером
       });
     })();
     function premiumCached() {
@@ -1029,7 +1038,10 @@
       })();
     }
     function buildPlayerHtml(html, baseHref) {
-      var bridgeTag = '<script src="https://' + window.location.host + '/bridge.js?v=187' + (__bridgePremium ? '&premium=1' : '') + '"><\/script>';
+      // v192: путь к бриджу — с корнем текущей страницы ('' на vercel-корне,
+      // '/fm' на зеркале) — относительность внутри srcdoc не работает из-за <base>.
+      var __rootDir = (location.pathname.replace(/\/[^\/]*$/, '')) || '';
+      var bridgeTag = '<script src="https://' + window.location.host + __rootDir + '/bridge.js?v=187' + (__bridgePremium ? '&premium=1' : '') + '"><\/script>';
       var baseTag = '<base href="' + (baseHref || 'https://api.embess.ws/') + '">';
       var referrerMeta = '<meta name="referrer" content="no-referrer">';
       if (/<head[^>]*>/i.test(html)) {
@@ -1050,170 +1062,6 @@
       iframe.srcdoc = buildPlayerHtml(html, p.base);
       if (!quiet) { hidePlayerError(); loadingOverlay.classList.add('hidden'); }
       reportAvailable(true);
-    }
-    // ====== РЕЗЕРВНЫЙ ПЛЕЕР (v187): СВОЙ ПЛЕЕР НА API FLIXCDN ======
-    // Прямой iframe их сайта УДАЛЁН: их фронт (Playerjs 22.2.5) сломан
-    // против их же бэкенда (формат ":hls:" → 404 на каждом видео, проверено
-    // на их же домене 2026-09-25) — «резервный плеер перестал открываться».
-    // Теперь резервный плеер собираемся САМИ:
-    //   1) родитель запрашивает список качеств: /api/embed-edge?src=flix
-    //      (edge-коло вызывает их files-API — CDN-ссылки подписаны под IP
-    //      КОЛО);
-    //   2) видео идёт через /api/embed-edge?media=... — ТО ЖЕ коло → IP
-    //      совпадает → 206 (замерено на проде: 0.5с/чанк, seek работает);
-    //   3) реквизиты управления — свои (play/seek/качество/фуллскрин).
-    // Реклама отсутствует ВООБЩЕ (их скрипты не загружаются) — в т.ч.
-    // для премиума, как просил пользователь.
-    var __flixReadyTimer = null;
-    var __flixFails = 0; // повторные попытки — обход кеша подписей (fresh=1)
-
-    function installBackupPlayer(qualities) {
-      if (__playStarted) return;
-      console.log('[player] flix qualities OK, building backup player');
-      iframe.removeAttribute('src');
-      iframe.srcdoc = buildBackupPlayerHtml(qualities);
-      reportAvailable(true);
-      // если метаданные так и не пришли — экран ошибки (25с)
-      if (__flixReadyTimer) clearTimeout(__flixReadyTimer);
-      __flixReadyTimer = setTimeout(function() {
-        __flixReadyTimer = null;
-        if (!__playStarted && __srcMode === 'backup') onBackupError('ready-timeout');
-      }, 25000);
-    }
-    function onBackupReady() {
-      if (__playStarted) return;
-      __flixFails = 0;
-      if (__flixReadyTimer) { clearTimeout(__flixReadyTimer); __flixReadyTimer = null; }
-      console.log('[player] OK via flix-backup in', ((performance.now() - loadStartTime) / 1000).toFixed(2) + 's');
-      loadingOverlay.classList.add('hidden');
-      hidePlayerError();
-    }
-    function onBackupError(msg) {
-      if (__playStarted) return;
-      __flixFails++;
-      console.warn('[player] flix-backup error:', msg || 'unknown');
-      if (__flixReadyTimer) { clearTimeout(__flixReadyTimer); __flixReadyTimer = null; }
-      showPlayerError('throttled');
-    }
-
-    // Список качеств с сервера → сборка своего плеера в srcdoc.
-    // gen замыкает гонку с переключением режимов/ретраями.
-    function loadBackupPlayer() {
-      var gen = __bgRetry.gen;
-      loadingOverlay.classList.remove('hidden');
-      setProgress('Подключение резервного источника…');
-      var edge = (window.FilmotivAPIOrigin && window.FilmotivAPIOrigin.edgeUrl)
-        ? window.FilmotivAPIOrigin.edgeUrl('/api/embed-edge?src=flix&id=' + encodeURIComponent(kid) + (__flixFails > 0 ? '&fresh=1' : ''))
-        : ('/api/embed-edge?src=flix&id=' + encodeURIComponent(kid) + (__flixFails > 0 ? '&fresh=1' : ''));
-      var ctrl = new AbortController();
-      var timer = setTimeout(function() { try { ctrl.abort(); } catch (_) {} }, 15000);
-      fetch(edge, { signal: ctrl.signal }).then(function(r) {
-        clearTimeout(timer);
-        if (!r.ok) throw new Error('HTTP ' + r.status);
-        return r.json();
-      }).then(function(j) {
-        if (gen !== __bgRetry.gen || __playStarted) return;
-        if (!j || !j.ok || !j.qualities || !j.qualities.length) throw new Error((j && j.error) || 'no qualities');
-        installBackupPlayer(j.qualities);
-      }).catch(function(e) {
-        clearTimeout(timer);
-        if (gen !== __bgRetry.gen || __playStarted) return;
-        console.warn('[player] flix qualities failed:', e);
-        showPlayerError('throttled');
-      });
-    }
-
-    function buildBackupPlayerHtml(qualities) {
-      var qList = qualities.slice(0).sort(function(a, b) { return b.q - a.q; });
-      var pref = 720;
-      try { pref = parseInt(localStorage.getItem('flixq'), 10) || 720; } catch (_) {}
-      var startQ = qList[qList.length - 1];
-      for (var qi = 0; qi < qList.length; qi++) {
-        if (qList[qi].q <= pref) { startQ = qList[qi]; break; }
-      }
-      var kidJson = JSON.stringify(String(kid));
-      var qJson = JSON.stringify(qList);
-      var startJson = JSON.stringify(startQ);
-      return [
-        '<!doctype html><html><head><meta charset="utf-8">',
-        '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">',
-        '<style>',
-        'html,body{margin:0;height:100%;background:#000;overflow:hidden;font-family:\'Segoe UI\',Roboto,Arial,sans-serif}',
-        '#stage{position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:center}',
-        'video{width:100%;height:100%;object-fit:contain;background:#000}',
-        '#big{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:76px;height:76px;border-radius:50%;background:rgba(20,24,38,.85);border:1px solid rgba(120,200,255,.45);color:#7fd4ff;font-size:30px;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:5;transition:opacity .25s}',
-        '#big.hide,.uihide{opacity:0;pointer-events:none}',
-        '#bar{position:absolute;left:0;right:0;bottom:0;display:flex;align-items:center;gap:8px;padding:8px 12px;background:linear-gradient(transparent,rgba(4,6,12,.92) 40%);z-index:4;transition:opacity .25s}',
-        '.btn{background:none;border:0;color:#dfe9ff;font-size:19px;cursor:pointer;padding:2px 6px}',
-        '#seek{flex:1;appearance:none;-webkit-appearance:none;height:4px;border-radius:2px;background:rgba(255,255,255,.28);outline:0}',
-        '#seek::-webkit-slider-thumb{appearance:none;-webkit-appearance:none;width:13px;height:13px;border-radius:50%;background:#7fd4ff;cursor:pointer}',
-        '#seek::-moz-range-thumb{width:13px;height:13px;border:0;border-radius:50%;background:#7fd4ff;cursor:pointer}',
-        '#tc{color:#b9c7e2;font-size:12px;white-space:nowrap;font-variant-numeric:tabular-nums}',
-        '#qq{background:rgba(20,24,38,.9);color:#dfe9ff;border:1px solid rgba(120,200,255,.35);border-radius:8px;font-size:12px;padding:3px 6px;max-width:96px}',
-        '#res{position:absolute;left:50%;top:16%;transform:translateX(-50%);z-index:6;background:rgba(10,14,26,.94);border:1px solid rgba(120,200,255,.35);color:#dfe9ff;font-size:13px;padding:10px 14px;border-radius:12px;display:none;align-items:center;gap:10px}',
-        '#res button{background:rgba(127,212,255,.15);border:1px solid rgba(120,200,255,.45);color:#7fd4ff;border-radius:8px;padding:4px 10px;cursor:pointer;font-size:13px}',
-        '#err{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:7;color:#ffb1a8;background:rgba(30,10,10,.92);border:1px solid rgba(255,120,110,.4);padding:10px 16px;border-radius:10px;font-size:13px;display:none;text-align:center;max-width:80%}',
-        '</style></head><body>',
-        '<div id="stage">',
-        '<video id="v" playsinline preload="metadata"></video>',
-        '<div id="big">\u25B6</div>',
-        '<div id="err"></div>',
-        '<div id="res"><span id="resT"></span><button id="ryes">Да</button><button id="rno">Сначала</button></div>',
-        '<div id="bar">',
-        '<button class="btn" id="pp">\u25B6</button>',
-        '<input id="seek" type="range" min="0" max="1000" value="0" step="1">',
-        '<span id="tc">0:00 / 0:00</span>',
-        '<select id="qq" title="Качество"></select>',
-        '<button class="btn" id="mu">\uD83D\uDD07</button>',
-        '<button class="btn" id="fs">\u26F6</button>',
-        '</div></div>',
-        '<script>',
-        '(function(){',
-        'var V=document.getElementById("v"),BIG=document.getElementById("big"),BAR=document.getElementById("bar"),',
-        'SEEK=document.getElementById("seek"),TC=document.getElementById("tc"),PP=document.getElementById("pp"),',
-        'QQ=document.getElementById("qq"),FS=document.getElementById("fs"),MU=document.getElementById("mu"),',
-        'ERR=document.getElementById("err"),RES=document.getElementById("res"),RES_T=document.getElementById("resT"),STAGE=document.getElementById("stage");',
-        'var KID=' + kidJson + ',QLIST=' + qJson + ',START=' + startJson + ';',
-        'var started=false,resPending=null,hideT=null;',
-        'var post=function(m){try{parent.postMessage(m,"*")}catch(e){}};',
-        'function fmt(s){s=Math.max(0,Math.floor(s||0));var h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=s%60;',
-        'return (h?h+":"+(m<10?"0":"")+m:m)+":"+(x<10?"0":"")+x}',
-        'function showUI(){BIG.classList.toggle("hide",started);BAR.classList.remove("uihide");',
-        'if(hideT)clearTimeout(hideT);if(started)hideT=setTimeout(function(){BAR.classList.add("uihide")},2600)}',
-        'function setSrc(q,keep){var t=keep?V.currentTime:0;var wasPlaying=!V.paused&&started;',
-        'V.src=q.url;V.load();if(keep){var onm=function(){V.removeEventListener("loadedmetadata",onm);',
-        'try{if(t>0&&t<(V.duration||1e9))V.currentTime=t}catch(e){}if(wasPlaying)V.play()};',
-        'V.addEventListener("loadedmetadata",onm)}}',
-        'QLIST.forEach(function(q){var o=document.createElement("option");o.value=String(q.q);o.textContent=q.q+"p";if(q.q===START.q)o.selected=true;QQ.appendChild(o)});',
-        'setSrc(START,false);',
-        'function begin(){started=true;showUI();post({type:"play"});V.play().catch(function(){})}',
-        'BIG.addEventListener("click",begin);',
-        'PP.addEventListener("click",function(){if(V.paused){V.play()}else{V.pause()}});',
-        'V.addEventListener("play",function(){PP.textContent="\\u23F8";started=true;showUI();post({type:"play"})});',
-        'V.addEventListener("pause",function(){PP.textContent="\\u25B6";showUI()});',
-        'V.addEventListener("loadedmetadata",function(){post({type:"flix_ready"})});',
-        'V.addEventListener("timeupdate",function(){',
-        'if(V.duration>0){SEEK.value=String(Math.round(V.currentTime/V.duration*1000));',
-        'TC.textContent=fmt(V.currentTime)+" / "+fmt(V.duration)}',
-        'post({type:"timeupdate",currentTime:V.currentTime||0})});',
-        'SEEK.addEventListener("input",function(){if(V.duration>0){V.currentTime=SEEK.value/1000*V.duration;showUI()}});',
-        'QQ.addEventListener("change",function(){var q=parseInt(QQ.value,10);try{localStorage.setItem("flixq",String(q))}catch(e){}',
-        'for(var i=0;i<QLIST.length;i++){if(QLIST[i].q===q){setSrc(QLIST[i],true);break}}showUI()});',
-        'FS.addEventListener("click",function(){try{if(document.fullscreenElement){document.exitFullscreen()}else{STAGE.requestFullscreen()}}catch(e){}});',
-        'MU.addEventListener("click",function(){V.muted=!V.muted;MU.textContent=V.muted?"\\uD83D\\uDD07":"\\uD83D\\uDD0A";showUI()});',
-        'STAGE.addEventListener("mousemove",showUI);STAGE.addEventListener("touchstart",function(){showUI()},{passive:true});',
-        'V.addEventListener("error",function(){ERR.style.display="block";ERR.textContent="Ошибка загрузки видео — попробуйте другое качество или вернитесь к оригинальному плееру (кнопка \\u21C4)";post({type:"flix_error",message:"video-error"})});',
-        '// resume (свой localStorage — тот же origin, что и у сайта)',
-        'try{var saved=JSON.parse(localStorage.getItem("flixres:"+KID)||"null");',
-        'if(saved&&saved.t>30){RES_T.textContent="Продолжить с "+fmt(saved.t)+"?";RES.style.display="flex";',
-        'document.getElementById("ryes").addEventListener("click",function(){RES.style.display="none";resPending=saved.t;',
-        'var onm2=function(){try{V.currentTime=saved.t}catch(e){}begin()};',
-        'if(V.readyState>=1){onm2()}else{V.addEventListener("loadedmetadata",onm2,{once:true})}});',
-        'document.getElementById("rno").addEventListener("click",function(){RES.style.display="none";begin()})}}catch(e){}',
-        'setInterval(function(){if(started&&V.currentTime>5){try{localStorage.setItem("flixres:"+KID,JSON.stringify({t:V.currentTime,at:Date.now()}))}catch(e){}}},3000);',
-        '})();',
-        '<\/script></body></html>'
-      ].join('\n');
     }
     function setProgress(msg) {
       var el = document.getElementById('loadingSubtitle');
@@ -1246,7 +1094,7 @@
     // фоновые ретраи, вместо вечного чёрного экрана.
     function startVideoWatchdog() {
       setTimeout(function() {
-        if (__srcMode !== 'original' || __playStarted) return;
+        if (__playStarted) return;
         if (!__metaArrived && !__bridgeArrived) {
           console.warn('[player] watchdog: видео не отвечает за 25с → экран ошибки');
           showPlayerError('throttled');
@@ -1281,9 +1129,9 @@
             showPlayerError('missing');
             return;
           }
-          console.warn('[player] семейство исчерпано → резервный плеер (flix)');
-          loadBackupPlayer();
-          onDone('flix-backup');
+          console.warn('[player] семейство исчерпано → экран ошибки + фоновые ретраи (v192: резервный плеер удалён)');
+          showPlayerError('throttled');
+          startBgRetry();
         });
       });
     }
@@ -1292,18 +1140,13 @@
       __bridgePremium = !!premium;
       __bridgeArrived = false;
       __metaArrived = false;
-      console.log('[player] load start, mode =', __srcMode, ', premium =', !!premium);
+      console.log('[player] load start, premium =', !!premium);
       __bgRetry.gen++; // гасим возможный фоновый ретрай от прошлого запуска
       if (__bgRetry.timer) { clearInterval(__bgRetry.timer); __bgRetry.timer = null; }
       hidePlayerError();
       loadStartTime = performance.now();
       iframe.removeAttribute('src');
       iframe.removeAttribute('srcdoc');
-      if (__srcMode === 'backup') {
-        // РЕЗЕРВНЫЙ плеер (кнопка ⇄): свой плеер на flix-API, без ожиданий
-        loadBackupPlayer();
-        return;
-      }
       loadingOverlay.classList.remove('hidden');
       runOriginalChain(function(source) {
         console.log('[player] OK via', source, 'in', ((performance.now() - loadStartTime) / 1000).toFixed(2) + 's');
@@ -1338,7 +1181,6 @@
           console.log('[player] Bg retry OK via', source, 'after', tries, 'tries');
           loadingOverlay.classList.add('hidden');
           hidePlayerError();
-          showToast('Плеер загрузился — приятного просмотра!', 2500);
           startVideoWatchdog();
         });
       }, 15000);
@@ -1556,7 +1398,7 @@
         if (s) s.textContent = 'Источник пока не добавил этот фильм. Откройте другой фильм или попробуйте позже.';
       } else {
         if (t) t.textContent = 'Плеер недоступен';
-        if (s) s.textContent = 'Источник временно перегружен. Уже пробуем другие каналы автоматически — обычно проходит за пару минут. Можно переключиться на резервный плеер кнопкой ⇄ в шапке.';
+        if (s) s.textContent = 'Источник временно перегружен. Уже пробуем другие каналы автоматически — обычно проходит за пару минут.';
       }
       el.classList.add('visible');
     }
@@ -1568,25 +1410,15 @@
     if (peRetry) peRetry.addEventListener('click', function() { hidePlayerError(); loadingOverlay.classList.remove('hidden'); loadPlayer(__bridgePremium); });
     var peClose = document.getElementById('peClose');
     if (peClose) peClose.addEventListener('click', function() {
-      try { window.location.replace(new URL('/', location.href).href); } catch (_) { window.location.href = '/'; }
+      try { window.location.replace('index.html'); } catch (_) { window.location.href = 'index.html'; }
     });
-    // «Резервный плеер» на экране ошибки: смена канала БЕЗ перезагрузки
-    // страницы (как и кнопка ⇄ в шапке)
-    var peAlt = document.getElementById('peAlt');
-    if (peAlt) peAlt.addEventListener('click', function() {
-      __srcMode = 'backup';
-      hidePlayerError();
-      loadPlayer(__bridgePremium || premiumCached());
-    });
-    // Кнопка ⇄ в шапке: оригинальный ↔ резервный, страница НЕ перезагружается
-    var srcBtn = document.getElementById('srcBtn');
-    if (srcBtn) srcBtn.addEventListener('click', function() {
-      __srcMode = (__srcMode === 'original') ? 'backup' : 'original';
-      showToast(__srcMode === 'backup'
-        ? 'Резервный плеер (без рекламы)'
-        : 'Оригинальный плеер', 2200);
-      loadPlayer(__bridgePremium || premiumCached());
-    });
+    // v192: прозрачная подсказка по центру плеера — после загрузки страницы,
+    // pointer-events:none (клики проходят насквозь), плавно гаснет через 7с.
+    var playHint = document.getElementById('playHint');
+    if (playHint) {
+      setTimeout(function() { playHint.classList.add('visible'); }, 1200);
+      setTimeout(function() { playHint.classList.remove('visible'); }, 8200);
+    }
   </script>
 </body>
 </html>

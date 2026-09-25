@@ -8,9 +8,9 @@
   <meta name="description" content="Смотрите фильм онлайн в хорошем качестве на Filmotiv. Бесплатные фильмы онлайн.">
   <meta name="robots" content="index, follow">
   <link rel="canonical" href="https://filmotiv.vercel.app/">
-  <link rel="icon" type="image/x-icon" href="/fm/favicon.ico">
-  <link rel="icon" type="image/png" sizes="192x192" href="/fm/icon-192.png">
-  <link rel="manifest" href="/fm/manifest.json">
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+  <link rel="manifest" href="manifest.json">
 
   <!-- Open Graph -->
   <meta property="og:type" content="video.movie">
@@ -169,7 +169,7 @@
     <div class="orb three"></div>
   </div>
   <div class="container">
-    <a class="back-pill" href="/fm/">← На главную</a>
+    <a class="back-pill" href="index.html">← На главную</a>
     <div class="adhd-card">
       <div class="eyebrow" style="text-align:center;">🎬 Cinema OS · Каталог</div>
       <div class="poster-wrap"><img class="poster" id="filmPoster" alt="Постер фильма"></div>
@@ -208,7 +208,7 @@
   }
   </script>
 
-  <script src="/fm/js/api-origin.js?v=189"></script>
+  <script src="js/api-origin.js?v=192"></script>
   <script>
     // Extract film ID from URL (?id=251733 or /film/251733)
     var params = new URLSearchParams(window.location.search);
@@ -234,7 +234,7 @@
         }
       } catch (_) {}
       if (filmId) {
-        window.location.href = '/player.html?id=' + encodeURIComponent(filmId);
+        window.location.href = 'player.html?id=' + encodeURIComponent(filmId);
       } else {
         window.location.href = '/';
       }

@@ -163,6 +163,27 @@
         return out.join(' ');
       } catch (_) { return ''; }
     },
+    // v192: SVG-флаги вместо эмодзи. Windows/Chrome НЕ рендерит эмодзи-флаги
+    // (в Segoe UI Emoji нет глифов флагов — видны буквенные пары «US»),
+    // поэтому под карточками флагов «не было» на ПК. Самохранящиеся
+    // public/img/flags/{ISO}.svg — работают на vercel-корне и под /fm/.
+    flagImgsOf: function(film, n) {
+      try {
+        var list = (film && film.countries) || [];
+        var k = Math.max(1, n || 1);
+        var out = [];
+        for (var i = 0; i < list.length && out.length < k; i++) {
+          var c = list[i] && list[i].country;
+          if (!c) continue;
+          var s = String(c).trim();
+          var iso = /^[a-zA-Z]{2}$/.test(s) ? s.toUpperCase()
+            : (App.CORE.COUNTRY_ISO[s] || App.CORE.COUNTRY_ISO[s.replace(/ё/g, 'е')]);
+          if (!iso || !/^[A-Z]{2}$/.test(iso)) continue;
+          out.push('<img class="film-flag-img" src="img/flags/' + iso + '.svg" alt="' + iso + '" title="' + App.CORE.escapeHtml(s) + '" loading="lazy" style="width:21px;height:15px;border-radius:2.5px;object-fit:cover;vertical-align:-2px;margin:0 1px;display:inline-block">');
+        }
+        return out.join(' ');
+      } catch (_) { return ''; }
+    },
 
     // --- Mobile detection ---
     isMobileView: function() {
@@ -641,7 +662,7 @@
         // Meta: год · флаги стран производства · жанры · длина · рейтинг
         // Страна производства — ТОЛЬКО флагом, текст (США/us) убран
         // (запрос пользователя). Флаг — сразу после года выпуска.
-        var flag = App.CORE.flagsOf(film, 2);
+        var flag = App.CORE.flagImgsOf(film, 2);
         var metaParts = [];
         if (year) metaParts.push('<span>' + year + '</span>');
         if (flag) metaParts.push('<span class="film-flag">' + flag + '</span>');
@@ -1878,7 +1899,7 @@
     window.addEventListener('load', function() {
       // Register SW only ONCE per session — don't unregister on every load
       // (was causing infinite reload loop on bad internet)
-      navigator.serviceWorker.register('/fm/sw.js', { scope: '/fm/' }).then(function(reg) {
+      navigator.serviceWorker.register('sw.js').then(function(reg) {
         console.log('[sw] registered, scope:', reg.scope);
         // Check for updates every 10 min — but DON'T auto-reload on
         // controllerchange. New SW will activate on next manual page load.

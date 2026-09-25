@@ -53,7 +53,7 @@
 </style>
 
 
-<script src="/fm/vendor/vconsole.min.js"></script>
+<script src="/vendor/vconsole.min.js"></script>
 <script>
 console.log('[debug] vConsole lib loaded, VConsole type:', typeof window.VConsole);
 (function() {
@@ -553,10 +553,10 @@ console.log('[debug] vConsole lib loaded, VConsole type:', typeof window.VConsol
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,maximum-scale=1,minimum-scale=1">
   <meta name="referrer" content="origin">
-  <link rel="icon" type="image/x-icon" href="/fm/favicon.ico">
-  <link rel="icon" type="image/png" sizes="192x192" href="/fm/icon-192.png">
-  <link rel="shortcut icon" type="image/x-icon" href="/fm/favicon.ico">
-  <script src="/fm/i18n.js"></script>
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+  <link rel="shortcut icon" type="image/x-icon" href="favicon.ico">
+  <script src="i18n.js"></script>
   <title>[DEBUG] Плеер</title>
   <script>
     // ====== Performance & error logging ======
@@ -907,7 +907,7 @@ console.log('[debug] vConsole lib loaded, VConsole type:', typeof window.VConsol
       if (!btn) return;
       function goHome() {
         try { window.location.href = '/'; } catch (e) {
-          try { window.location.replace('/'); } catch (_) {}
+          try { window.location.replace('index.html'); } catch (_) {}
         }
       }
       btn.addEventListener('click', goHome);

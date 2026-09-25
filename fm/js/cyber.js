@@ -222,13 +222,13 @@
       var meta = [];
       var y = f.year || '';
       var gens = (f.genres || []).slice(0, 2).map(function(g) { return g.genre; }).join(', ');
-      // v190: регион производства — ФЛАГОМ страны, не текстом (запрос владельца).
-      // До двух флагов; если страна неизвестна справочнику — фолбэк на текст.
-      var flags = App.CORE.flagsOf ? App.CORE.flagsOf(f, 2) : '';
+      // v192: регион производства — SVG-флагом (Windows/Chrome не рендерит
+      // эмодзи-флаги). До двух флагов; вне справочника — фолбэк на текст.
+      var flags = App.CORE.flagImgsOf ? App.CORE.flagImgsOf(f, 2) : '';
       var cts = (f.countries || []).slice(0, 2).map(function(c) { return c.country; }).join(', ');
-      var region = flags || cts;
       if (y) meta.push(esc(y));
-      if (region) meta.push(esc(region));
+      if (flags) meta.push(flags);
+      else if (cts) meta.push(esc(cts));
       if (gens) meta.push(esc(gens));
       if (f.filmLength) meta.push(esc(f.filmLength) + ' мин');
       var r = ratingOf(f);
@@ -250,7 +250,7 @@
         '</div>' +
       '</div>';
     }
-    html += '<div class="cyber-hero-count" id="cyberHeroCount">01 / ' + ('0' + heroFilms.length).slice(-2) + '</div>';
+    // Счётчик «01 / 15» удалён по запросу владельца (v192) — остались только точки.
     html += '<div class="cyber-hero-dots" id="cyberHeroDots">';
     for (var j = 0; j < heroFilms.length; j++) {
       html += '<button class="cyber-hero-dot' + (j === 0 ? ' active' : '') + '" data-dot="' + j + '" type="button" aria-label="Слайд ' + (j + 1) + '"></button>';
@@ -289,8 +289,6 @@
     for (var k = 0; k < slides.length; k++) slides[k].classList.toggle('active', k === i);
     for (var d = 0; d < dots.length; d++) dots[d].classList.toggle('active', d === i);
     heroLoadBg(i);
-    var cnt = $('cyberHeroCount');
-    if (cnt) cnt.textContent = ('0' + (i + 1)).slice(-2) + ' / ' + ('0' + slides.length).slice(-2);
   }
 
   function heroBind() {
@@ -482,7 +480,7 @@
     for (var i = 0; i < list.length; i++) {
       var f = list[i];
       var r = ratingOf(f);
-      var flag = App.CORE.flagOf ? App.CORE.flagOf(f) : '';
+      var flag = App.CORE.flagImgsOf ? App.CORE.flagImgsOf(f, 1) : '';
       // по Figma: рейтинг (зелёный бейдж) + год + флаг страны под названием
       html += '<div class="cyber-card" data-fid="' + esc(filmIdOf(f)) + '" data-title="' + esc(titleOf(f)) + '">' +
         '<div class="cyber-card-poster">' +

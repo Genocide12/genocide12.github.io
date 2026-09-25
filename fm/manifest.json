@@ -2,8 +2,8 @@
   "name": "Filmotiv",
   "short_name": "Filmotiv",
   "description": "Смотри фильмы в хорошем качестве - каталог лучших фильмов",
-  "start_url": "/fm/?source=pwa",
-  "scope": "/fm/",
+  "start_url": "./?source=pwa",
+  "scope": "./",
   "display": "standalone",
   "display_override": [
     "standalone",
@@ -20,25 +20,25 @@
   ],
   "icons": [
     {
-      "src": "/fm/icon-192.png",
+      "src": "icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/fm/icon-maskable-192.png",
+      "src": "icon-maskable-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "maskable"
     },
     {
-      "src": "/fm/icon-512.png",
+      "src": "icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/fm/icon-maskable-512.png",
+      "src": "icon-maskable-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"

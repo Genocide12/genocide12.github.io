@@ -47,7 +47,7 @@
   var PROJECT = 'https://filmotiv-genocide12s-projects.vercel.app';      // стабильный: последний prod
   var BRANCH = 'https://filmotiv-git-main-genocide12s-projects.vercel.app'; // стабильный: ветка main
   var BACKUP = 'https://filmotiv-5sp8sjewa-genocide12s-projects.vercel.app'; // per-deployment (устаревает)
-  var MIRROR = 'https://genocide12.github.io/fm/';
+  var MIRROR = 'https://genocide12.github.io/fm/'; // v192: зеркало переехало в /fm/ (корень github.io — общий лендинг)
   var LS_KEY = 'filmotiv_api_origin_v3';
   var TTL = 60 * 60 * 1000; // 1 час
 
