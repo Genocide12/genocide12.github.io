@@ -1509,17 +1509,23 @@
   // ====== Handle OAuth redirect (if returning from Telegram login) ======
   App.AUTH.handleOAuthRedirect();
 
-  // v196: подтверждение успешного входа после перезагрузки (флаг в
-  // localStorage с меткой времени, годен 15с — ставят обе ветки входа).
+  // v197: подтверждение успешного входа после перезагрузки. Флаг ставит
+  // ветка входа; проверяем его ОТЛОЖЕННО и только на «чистом» URL —
+  // раньше консьюмер выполнялся в том же тике, что и ветка (съедал флаг
+  // и рисовал тост за миг до reload, который его убивал).
   try {
-    var justRaw = localStorage.getItem('filmotiv_just_logged_in');
-    if (justRaw) {
-      localStorage.removeItem('filmotiv_just_logged_in');
-      var justObj = JSON.parse(justRaw);
-      if (justObj && justObj.name && (Date.now() - (justObj.ts || 0)) < 15000 && App.UI && App.UI.showToast) {
-        App.UI.showToast('✅ Вы вошли как ' + justObj.name + ' — коллекция синхронизирована', 4500);
-      }
-    }
+    setTimeout(function() {
+      try {
+        if (location.search.indexOf('tg_id=') !== -1 || location.search.indexOf('telegram_login=') !== -1) return;
+        var justRaw = localStorage.getItem('filmotiv_just_logged_in');
+        if (!justRaw) return;
+        localStorage.removeItem('filmotiv_just_logged_in');
+        var justObj = JSON.parse(justRaw);
+        if (justObj && justObj.name && (Date.now() - (justObj.ts || 0)) < 15000 && App.UI && App.UI.showToast) {
+          App.UI.showToast('✅ Вы вошли как ' + justObj.name + ' — коллекция синхронизирована', 4500);
+        }
+      } catch (_) {}
+    }, 1200);
   } catch (_) {}
 
   // ====== Setup login bar + auth check ======
