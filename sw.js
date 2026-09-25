@@ -1,9 +1,9 @@
-// Filmotiv Service Worker v185
+// Filmotiv Service Worker v191
 // SIMPLIFIED — does NOT intercept navigation requests.
 // Only caches static assets (JS/CSS/images) for offline.
 // HTML pages go directly to network — no SW interference.
 
-const CACHE_NAME = 'filmotiv-v190';
+const CACHE_NAME = 'filmotiv-v191';
 const STATIC_ASSETS = [
   '/css/app.css',
   '/css/cyber.css',
