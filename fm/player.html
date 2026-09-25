@@ -221,15 +221,38 @@
       pointer-events:none;
     }
     .toast.visible { display:block; }
-    /* v192: прозрачная подсказка по центру плеера — клики проходят насквозь */
+    /* v193: подсказка «Нажмите play» — украшенная пилюля: стекло с блюром,
+       фиолетовая рамка, неон-свечение (ADHD OS), светящийся ▶-бейдж.
+       pointer-events:none — клики проходят насквозь к плееру. */
     .play-hint {
       position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
-      z-index:3; pointer-events:none; background:transparent;
-      color:rgba(255,255,255,.92); font:600 16px/1.45 system-ui,-apple-system,sans-serif;
-      text-shadow:0 1px 10px rgba(0,0,0,.85); text-align:center; max-width:84%;
-      opacity:0; transition:opacity .6s ease; padding:6px 12px;
+      z-index:3; pointer-events:none;
+      display:flex; align-items:center; gap:10px;
+      padding:12px 22px 12px 12px; border-radius:999px;
+      background:rgba(8,10,24,.62);
+      -webkit-backdrop-filter:blur(12px); backdrop-filter:blur(12px);
+      border:1.5px solid rgba(168,132,252,.6);
+      box-shadow:0 14px 40px rgba(0,0,0,.55), 0 0 26px rgba(139,92,246,.3), inset 0 1px 0 rgba(255,255,255,.14);
+      color:#fff; font:800 16px/1 system-ui,-apple-system,sans-serif;
+      letter-spacing:.01em; white-space:nowrap;
+      opacity:0; transition:opacity .45s ease, transform .45s ease;
+      transform:translate(-50%,-46%);
     }
-    .play-hint.visible { opacity:1; }
+    .play-hint.visible { opacity:1; transform:translate(-50%,-50%); }
+    .play-hint-ico {
+      display:flex; align-items:center; justify-content:center;
+      width:34px; height:34px; border-radius:50%; flex:none;
+      background:linear-gradient(135deg,#8b5cf6,#e33bd0);
+      font-size:12px; padding-left:3px;
+      animation:playHintPulse 2s ease-in-out infinite;
+    }
+    @keyframes playHintPulse {
+      0%,100% { box-shadow:0 0 14px rgba(139,92,246,.55); }
+      50%     { box-shadow:0 0 28px rgba(237,59,208,.8); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .play-hint-ico { animation:none; }
+    }
     .loading-overlay {
       position:absolute;
       inset:0;
@@ -396,9 +419,10 @@
       </div>
     </div>
     <div class="toast" id="toast"></div>
-    <!-- v192: прозрачная подсказка по центру плеера; pointer-events:none —
-         клики проходят насквозь; показывается после загрузки страницы -->
-    <div class="play-hint" id="playHint">Нажмите play и значок</div>
+    <!-- v193: подсказка по центру плеера — стеклянная пилюля в рамке;
+         pointer-events:none — клики проходят насквозь; скрывается при
+         запуске видео (play) или по тапу пользователя -->
+    <div class="play-hint" id="playHint"><span class="play-hint-ico">▶</span><span>Нажмите play</span></div>
     <!-- Rate film overlay — appears when film ends -->
     <div class="rate-overlay" id="rateOverlay">
       <div class="rate-card">
@@ -1412,12 +1436,27 @@
     if (peClose) peClose.addEventListener('click', function() {
       try { window.location.replace('index.html'); } catch (_) { window.location.href = 'index.html'; }
     });
-    // v192: прозрачная подсказка по центру плеера — после загрузки страницы,
-    // pointer-events:none (клики проходят насквозь), плавно гаснет через 7с.
+    // v193: подсказка «Нажмите play» — показ через 1.2с после загрузки
+    // страницы; скрывается, когда видео РЕАЛЬНО стартовало (мост bridge.js
+    // шлёт 'play' / 'timeupdate' с currentTime>0), по первому тапу по
+    // странице или по страховочному таймеру 15с (если play так и не пришёл).
     var playHint = document.getElementById('playHint');
+    var playHintGone = false;
+    function hidePlayHint() {
+      if (playHintGone || !playHint) return;
+      playHintGone = true;
+      playHint.classList.remove('visible');
+    }
     if (playHint) {
-      setTimeout(function() { playHint.classList.add('visible'); }, 1200);
-      setTimeout(function() { playHint.classList.remove('visible'); }, 8200);
+      setTimeout(function() { if (!playHintGone) playHint.classList.add('visible'); }, 1200);
+      setTimeout(hidePlayHint, 15000);
+      document.addEventListener('pointerdown', hidePlayHint, { once:true, capture:true });
+      window.addEventListener('message', function(e) {
+        var d = e.data;
+        if (typeof d === 'string') { try { d = JSON.parse(d); } catch (_) { return; } }
+        if (!d || typeof d !== 'object') return;
+        if (d.type === 'play' || (d.type === 'timeupdate' && d.currentTime > 0)) hidePlayHint();
+      });
     }
   </script>
 </body>

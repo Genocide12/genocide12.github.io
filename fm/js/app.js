@@ -357,22 +357,16 @@
         fixedBtn.classList.add('hidden-by-tv');
       } else {
         fixedBtn.classList.remove('hidden');
-        if (fixedText) {
-          if (isLoggedIn) {
-            fixedText.textContent = 'Открыть Telegram';
-            fixedBtn.href = 'https://t.me/Filmotivbot?start=app';
-            fixedBtn.onclick = null;
-          } else {
-            fixedText.textContent = 'Открыть Telegram';
-            var guestId = localStorage.getItem('filmotiv_user_id');
-            if (guestId && guestId.indexOf('web_') === 0) {
-              fixedBtn.href = '/api/auth/telegram/login?guest_id=' + encodeURIComponent(guestId);
-            } else {
-              fixedBtn.href = '/api/auth/telegram/login';
-            }
-            fixedBtn.onclick = null;
-          }
-        }
+        // v193: кнопка ВСЕГДА ведёт на бота в Telegram (t.me), как устроено
+        // в живом Genopoisk: раньше гостям href подменялся на OAuth
+        // /api/auth/telegram/login — до whitelist домена в @BotFather
+        // (/setdomain) Telegram отвечал «Bot domain invalid» и кнопка
+        // «не работала». Прямая t.me-ссылка работает всегда и без условий.
+        // Вход через Telegram-OIDC остаётся доступен по кнопке «🔑 Войти
+        // через Telegram» в пустом состоянии коллекции.
+        if (fixedText) fixedText.textContent = 'Открыть Telegram';
+        fixedBtn.href = 'https://t.me/Filmotivbot?start=app';
+        fixedBtn.onclick = null;
       }
     },
 
