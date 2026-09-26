@@ -348,7 +348,40 @@
       year: f.year || '', rating: ratingOf(f)
     };
   }
+  function isSiteLoggedIn() {
+    if (getTgInitData()) return true; // Mini App — вход всегда есть
+    try { return !!localStorage.getItem('filmotiv_tg_user_id'); } catch (_) { return false; }
+  }
+  // Гость нажал «В коллекцию»: состояние НЕ меняем, показываем подсказку
+  // и подсвечиваем нижний бар «Открыть Telegram» (для гостя он ведёт на вход).
+  function showGuestFavHint(btn) {
+    try {
+      if (btn) {
+        btn.classList.add('fav-shake');
+        setTimeout(function() { btn.classList.remove('fav-shake'); }, 600);
+      }
+    } catch (_) {}
+    try {
+      if (typeof App !== 'undefined' && App.UI && App.UI.showToast) {
+        App.UI.showToast('🔐 Войдите через Telegram, чтобы собирать коллекцию', 4500);
+      }
+    } catch (_) {}
+    try {
+      var bar = document.getElementById('fixedTelegramBtn');
+      if (bar && !bar.classList.contains('hidden')) {
+        bar.style.transition = 'box-shadow .35s ease';
+        var n = 0;
+        var iv = setInterval(function() {
+          bar.style.boxShadow = (n % 2 === 0) ? '0 0 0 3px rgba(139,92,246,.85), 0 0 18px rgba(236,72,153,.65)' : '';
+          if (++n > 5) { clearInterval(iv); bar.style.boxShadow = ''; }
+        }, 350);
+      }
+    } catch (_) {}
+  }
   function toggleFav(f, btn) {
+    // Неавторизованным добавлять нельзя — раньше кнопка ложно «добавляла»
+    // (и падала с ReferenceError: renderFavs не существует). Теперь — подсказка.
+    if (!isSiteLoggedIn()) { showGuestFavHint(btn); return; }
     var fid = String(filmIdOf(f));
     var favs = readFavs();
     var has = favs.some(function(x) { return String(x.filmId || x.kinopoiskId) === fid; });
@@ -361,7 +394,9 @@
     }
     writeFavs(favs);
     updateFavBtn(btn, !has);
-    renderFavs();
+    // renderFavs() удалён: функции не существовало ни в одной версии (ReferenceError
+    // из багрепорта v192). Сетка коллекции перерисовывается сама при входе в
+    // категорию (App.MOVIES.loadFavorites в обработчиках навигации).
   }
   function updateFavBtn(btn, inFav) {
     if (!btn) return;

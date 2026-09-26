@@ -100,7 +100,7 @@
     })();
   </script>
   <link rel="stylesheet" href="css/app.css?v=194">
-  <link rel="stylesheet" href="css/cyber.css?v=192">
+  <link rel="stylesheet" href="css/cyber.css?v=203">
   <!-- Structured Data for Search Engines (JSON-LD) -->
   <script type="application/ld+json">
   {
@@ -166,6 +166,8 @@
       var fill = document.getElementById('plFill');
       var status = document.getElementById('plStatus');
       var done = false, finished = false, p = 0;
+      var t0 = Date.now();
+      var MIN_SHOW = 1000; // прелоадер живёт минимум 1с — без этого на быстрой сети он только мигает
       document.documentElement.classList.add('pl-loading');
       var phrases = ['Включаем свет…', 'Загружаем каталог…', 'Готовим постеры…', 'Почти готово…'];
       var pi = 0;
@@ -178,13 +180,16 @@
         if (finished) return;
         finished = true;
         clearInterval(rot);
+        // Держим экран минимум MIN_SHOW от старта: если страница загрузилась быстрее,
+        // добираем остаток секунды, затем плавно убираем
+        var wait = Math.max(350, MIN_SHOW - (Date.now() - t0));
         setTimeout(function () {
           if (done) return;
           done = true;
           el.classList.add('pl-done');
           document.documentElement.classList.remove('pl-loading');
           setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 700);
-        }, 350);
+        }, wait);
       }
       setP(55);
       if (document.readyState === 'complete') { setP(100); finish(); }
@@ -466,6 +471,6 @@
   <!-- All JS bundled into one file (core + device + auth + ui + movies + tracking + app) -->
   <script defer src="js/app.js?v=199"></script>
   <!-- Neon dashboard: сайдбар, герой, секции, жанры, рейл, режим поиска -->
-  <script defer src="js/cyber.js?v=192"></script>
+  <script defer src="js/cyber.js?v=203"></script>
 </body>
 </html>

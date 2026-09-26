@@ -533,6 +533,16 @@ body.gp-open .gp-backdrop { opacity: 1; pointer-events: auto; }
   background: rgba(255, 45, 155, .12);
 }
 .cyber-btn-ghost.in-fav .fav-svg { fill: currentColor; }
+/* Гость нажал «В коллекцию» — короткая встряска как подсказка (см. cyber.js showGuestFavHint) */
+@keyframes favshake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-3px); }
+  40% { transform: translateX(3px); }
+  60% { transform: translateX(-2px); }
+  80% { transform: translateX(2px); }
+}
+.cyber-btn-ghost.fav-shake { animation: favshake .5s ease; border-color: rgba(255, 45, 155, .7); }
+@media (prefers-reduced-motion: reduce) { .cyber-btn-ghost.fav-shake { animation: none; } }
 
 .cyber-hero-count {
   position: absolute;

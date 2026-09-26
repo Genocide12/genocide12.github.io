@@ -1,10 +1,11 @@
-// Filmotiv Service Worker v202 (v202: прелоадер стартовой страницы в index.html;
+// Filmotiv Service Worker v203 (v203: фикс избранного для гостей + подсказка входа,
+// прелоадер минимум 1с; v202: прелоадер стартовой страницы в index.html;
 // v192: относительные пути — работает и под /fm/ на зеркале; резервный плеер удалён)
 // SIMPLIFIED — does NOT intercept navigation requests.
 // Only caches static assets (JS/CSS/images) for offline.
 // HTML pages go directly to network — no SW interference.
 
-const CACHE_NAME = 'filmotiv-v202';
+const CACHE_NAME = 'filmotiv-v203';
 const STATIC_ASSETS = [
   'css/app.css',
   'css/cyber.css',
