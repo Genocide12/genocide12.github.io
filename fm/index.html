@@ -100,7 +100,7 @@
     })();
   </script>
   <link rel="stylesheet" href="css/app.css?v=194">
-  <link rel="stylesheet" href="css/cyber.css?v=203">
+  <link rel="stylesheet" href="css/cyber.css?v=204">
   <!-- Structured Data for Search Engines (JSON-LD) -->
   <script type="application/ld+json">
   {
@@ -131,8 +131,10 @@
 <body>
   <!-- ===== Preloader (task 45): экран загрузки до полной готовности стартовой ===== -->
   <style>
-    #preloader{position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;background:radial-gradient(120% 120% at 50% 0%,#0a0c1c 0%,#04050d 60%);transition:opacity .55s ease,visibility .55s ease}
-    #preloader.pl-done{opacity:0;visibility:hidden;pointer-events:none}
+    #preloader,#loaderOverlay{position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;background:radial-gradient(120% 120% at 50% 0%,#0a0c1c 0%,#04050d 60%);transition:opacity .55s ease,visibility .55s ease}
+    #preloader.pl-done,#loaderOverlay.pl-done{opacity:0;visibility:hidden;pointer-events:none}
+    #loaderOverlay{display:none}
+    #loaderOverlay.on{display:flex}
     .pl-orb{position:absolute;border-radius:50%;filter:blur(70px);opacity:.5;animation:plFloat 12s ease-in-out infinite}
     .pl-orb.o1{width:280px;height:280px;background:#8b5cf6;top:-60px;left:-40px}
     .pl-orb.o2{width:240px;height:240px;background:#ec4899;bottom:-40px;right:-30px;animation-delay:-4s}
@@ -167,7 +169,8 @@
       var status = document.getElementById('plStatus');
       var done = false, finished = false, p = 0;
       var t0 = Date.now();
-      var MIN_SHOW = 1000; // прелоадер живёт минимум 1с — без этого на быстрой сети он только мигает
+      var MIN_SHOW = 1200; // (владелец) минимум 1.2с — на быстрой сети экран не должен мигать
+      var loadFired = false, loadFiredAt = 0, heroFired = false;
       document.documentElement.classList.add('pl-loading');
       var phrases = ['Включаем свет…', 'Загружаем каталог…', 'Готовим постеры…', 'Почти готово…'];
       var pi = 0;
@@ -176,12 +179,19 @@
         if (status) status.textContent = phrases[pi];
       }, 950);
       function setP(v) { p = Math.max(p, v); if (fill) fill.style.width = p + '%'; }
+      // Ждём не только window.load, но и первый постер героя (cyber.js шлёт
+      // событие filmotiv:hero-ready, когда активный фон загружен) — владелец:
+      // «не меньше времени загрузки всех элементов, особенно постеров».
+      function maybeFinish() {
+        if (!loadFired) return;
+        if (!heroFired && Date.now() - loadFiredAt < 4000) return;
+        finish();
+      }
       function finish() {
         if (finished) return;
         finished = true;
         clearInterval(rot);
-        // Держим экран минимум MIN_SHOW от старта: если страница загрузилась быстрее,
-        // добираем остаток секунды, затем плавно убираем
+        // Держим экран минимум MIN_SHOW от старта, затем плавно убираем
         var wait = Math.max(350, MIN_SHOW - (Date.now() - t0));
         setTimeout(function () {
           if (done) return;
@@ -192,14 +202,70 @@
         }, wait);
       }
       setP(55);
-      if (document.readyState === 'complete') { setP(100); finish(); }
-      else window.addEventListener('load', function () { setP(100); finish(); }, { once: true });
+      function onLoad() {
+        loadFired = true; loadFiredAt = Date.now();
+        setP(100);
+        maybeFinish();
+      }
+      if (document.readyState === 'complete') onLoad();
+      else window.addEventListener('load', onLoad, { once: true });
+      document.addEventListener('filmotiv:hero-ready', function () {
+        heroFired = true;
+        maybeFinish();
+      });
       if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { setP(85); });
       // Failsafe: даже на самом медленном соединении экран уйдёт сам
-      setTimeout(function () { setP(100); finish(); }, 7000);
+      setTimeout(function () { loadFired = true; setP(100); finish(); }, 7000);
+    })();
+    // ===== Универсальный лоадер контента (категории, коллекция, поиск) —
+    // тот же визуал, что у стартового прелоадера. Старый кубический #loader
+    // удалён (владелец: «везде сделай новый»).
+    window.FilmotivLoader = (function () {
+      var el, fill, st, hideTimer, showT0 = 0, rot = null, phI = 0;
+      var phrases = ['Загружаем каталог…', 'Готовим постеры…', 'Почти готово…'];
+      function ensure() {
+        if (el) return true;
+        el = document.getElementById('loaderOverlay');
+        if (!el) return false;
+        fill = document.getElementById('loFill');
+        st = document.getElementById('loStatus');
+        return true;
+      }
+      return {
+        show: function (msg) {
+          if (!ensure()) return;
+          if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+          el.classList.remove('pl-done');
+          el.classList.add('on');
+          if (fill) fill.style.width = '55%';
+          if (st) st.textContent = msg || phrases[0];
+          if (rot) clearInterval(rot);
+          rot = setInterval(function () { phI = (phI + 1) % phrases.length; if (st) st.textContent = phrases[phI]; }, 1100);
+          showT0 = Date.now();
+        },
+        hide: function (minMs) {
+          if (!ensure() || !el.classList.contains('on')) return;
+          if (fill) fill.style.width = '100%';
+          var wait = Math.max(minMs || 450, 700 - (Date.now() - showT0));
+          setTimeout(function () {
+            if (rot) { clearInterval(rot); rot = null; }
+            el.classList.add('pl-done');
+            hideTimer = setTimeout(function () { el.classList.remove('on'); el.classList.remove('pl-done'); }, 600);
+          }, wait);
+        }
+      };
     })();
   </script>
   <!-- ===== /Preloader ===== -->
+  <!-- ===== Универсальный оверлей загрузки контента (тот же визуал; показывается
+       при загрузке категорий/коллекции/поиска — window.FilmotivLoader) ===== -->
+  <div id="loaderOverlay" aria-hidden="true">
+    <div class="pl-orb o1"></div><div class="pl-orb o2"></div><div class="pl-orb o3"></div>
+    <div class="pl-emblem"><div class="pl-strip"></div><span>F</span></div>
+    <div class="pl-title">Film<b>otiv</b></div>
+    <div class="pl-bar"><div class="pl-fill" id="loFill"></div></div>
+    <div class="pl-status" id="loStatus">Загружаем каталог…</div>
+  </div>
   <!-- Living background — неоновое свечение кибер-города -->
   <div class="background" aria-hidden="true">
     <div class="orb one"></div>
@@ -337,12 +403,6 @@
 
         <button class="cyber-backbar" id="cyberBack" type="button">← На главную</button>
         <div class="content hidden" id="content">
-          <div class="loader" id="loader">
-            <div class="fx-cube-loader">
-              <span></span><span></span><span></span><span></span>
-            </div>
-            <div class="loader-text">Загрузка...</div>
-          </div>
           <div class="film-grid" id="filmGrid"></div>
           <button class="cyber-more" id="loadMoreBtn" type="button" hidden>Показать ещё</button>
         </div>
@@ -469,8 +529,8 @@
   <!-- ADHD OS micro-interactions (confetti, toasts, haptics) -->
   <script defer src="js/adhd-os.js?v=191"></script>
   <!-- All JS bundled into one file (core + device + auth + ui + movies + tracking + app) -->
-  <script defer src="js/app.js?v=199"></script>
+  <script defer src="js/app.js?v=204"></script>
   <!-- Neon dashboard: сайдбар, герой, секции, жанры, рейл, режим поиска -->
-  <script defer src="js/cyber.js?v=203"></script>
+  <script defer src="js/cyber.js?v=204"></script>
 </body>
 </html>

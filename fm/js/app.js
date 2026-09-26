@@ -362,13 +362,16 @@
         // v193 («Bot domain invalid») устранена: владелец выполнил
         // /setdomain filmotiv.duckdns.org — страница входа проверена живьём.
         // Залогиненным по-прежнему открываем бота (t.me?start=app).
-        if (fixedText) fixedText.textContent = 'Открыть Telegram';
         if (isLoggedIn) {
+          if (fixedText) fixedText.textContent = 'Открыть Telegram';
           fixedBtn.href = 'https://t.me/Filmotivbot?start=app';
         } else {
-          var guestId = '';
-          try { guestId = localStorage.getItem('filmotiv_user_id') || ''; } catch (_) {}
-          fixedBtn.href = '/api/auth/telegram/login' + (guestId.indexOf('web_') === 0 ? '?guest_id=' + encodeURIComponent(guestId) : '');
+          // v204 (владелец): OIDC-страница в браузере без Telegram-сессии
+          // требует ввода номера телефона. Гость теперь уходит сразу в бота:
+          // Telegram узнаёт его мгновенно, вход — большой кнопкой START,
+          // затем кнопка «Открыть в браузере» из бота завершает привязку.
+          if (fixedText) fixedText.textContent = 'Войти через Telegram';
+          fixedBtn.href = 'https://t.me/Filmotivbot?start=login';
         }
         fixedBtn.onclick = null;
       }
@@ -543,14 +546,23 @@
   var App = window.FilmotivApp = window.FilmotivApp || {};
 
   App.UI = {
-    showLoader: function() {
+    showLoader: function(msg) {
       var content = document.getElementById('content');
-      var loader = document.getElementById('loader');
       if (content) content.classList.remove('hidden');
+      // v204: единый прелоадер в стиле стартового экрана (orbs + эмблема F +
+      // прогресс). Старый кубический #loader удалён по запросу владельца —
+      // «везде сделай новый». Фолбэк оставлен для страниц без overlay.
+      try {
+        if (window.FilmotivLoader) { window.FilmotivLoader.show(msg); return; }
+      } catch (_) {}
+      var loader = document.getElementById('loader');
       if (loader) loader.classList.remove('hidden');
     },
 
     hideLoader: function() {
+      try {
+        if (window.FilmotivLoader) { window.FilmotivLoader.hide(); return; }
+      } catch (_) {}
       var loader = document.getElementById('loader');
       if (loader) loader.classList.add('hidden');
     },
@@ -1213,13 +1225,13 @@
           // текст и пользователь не находил, как связать сайт с мини-аппом)
           var guestId = '';
           try { guestId = localStorage.getItem('filmotiv_user_id') || ''; } catch (_) {}
-          var loginUrl = '/api/auth/telegram/login' + (guestId.indexOf('web_') === 0 ? '?guest_id=' + encodeURIComponent(guestId) : '');
-          // v199: ОДНА кнопка авторизации (как в живом Genopoisk) — «💬 Войти
-          // через бота» удалена по просьбе владельца: дублировала вход и
-          // путала (два разных пути к одной цели).
+          // v204: вход одной кнопкой — через бота (Telegram узнаёт пользователя
+          // сразу, без формы номера телефона). start=login запускает в боте
+          // сценарий «Привязка устройства» с кнопкой открытия сайта.
+          var loginUrl = 'https://t.me/Filmotivbot?start=login';
           var loginHtml = 'Войдите через Telegram, чтобы видеть свою коллекцию ❤️<br>' +
             '<a class="login-cta" href="' + loginUrl + '">🔑 Войти через Telegram</a>' +
-            '<span class="login-hint">Откроется страница Telegram — подтвердите вход там.<br>При первом входе Telegram попросит номер телефона — это один раз.<br>Коллекция, история и премиум едины на сайте и в мини-аппе</span>';
+            '<span class="login-hint">Telegram откроется и узнает вас сразу — подтвердите вход кнопкой START.<br>Коллекция, история и премиум едины на сайте и в мини-аппе</span>';
           if (data.is_guest) {
             App.UI.showEmptyState(loginHtml, '🔑');
           } else if (data.reauth) {

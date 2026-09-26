@@ -270,16 +270,24 @@
       opacity:0;
       pointer-events:none;
     }
-    .spinner {
-      width:36px;
-      height:36px;
-      border:3px solid rgba(255,255,255,0.2);
-      border-top-color:#8b5cf6;
-      border-radius:50%;
-      animation:spin 0.8s linear infinite;
-      margin-right:12px;
-    }
-    @keyframes spin { to { transform:rotate(360deg); } }
+    /* ===== v204: прелоадер в стиле стартовой страницы ===== */
+    .loading-overlay .pl-box{position:relative;display:flex;flex-direction:column;align-items:center;gap:16px;z-index:1}
+    .pl-orb{position:absolute;border-radius:50%;filter:blur(60px);opacity:.45;animation:plFloat 12s ease-in-out infinite}
+    .pl-orb.o1{width:240px;height:240px;background:#8b5cf6;top:-70px;left:-50px}
+    .pl-orb.o2{width:210px;height:210px;background:#ec4899;bottom:-50px;right:-40px;animation-delay:-4s}
+    .pl-orb.o3{width:170px;height:170px;background:#38bdf8;top:40%;right:10%;opacity:.25;animation-delay:-8s}
+    @keyframes plFloat{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(26px,-20px) scale(1.08)}66%{transform:translate(-20px,16px) scale(.94)}}
+    .pl-emblem{position:relative;width:84px;height:84px;border-radius:24px;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,rgba(139,92,246,.22),rgba(236,72,153,.10));border:1px solid rgba(255,255,255,.14);box-shadow:0 0 42px rgba(139,92,246,.45),inset 0 1px 0 rgba(255,255,255,.18);animation:plPulse 2.2s ease-in-out infinite}
+    .pl-emblem span{font-size:40px;font-weight:900;letter-spacing:-.03em;background:linear-gradient(135deg,#a78bfa,#ec4899);-webkit-background-clip:text;background-clip:text;color:transparent}
+    .pl-strip{position:absolute;inset:6px;border-radius:18px;border:1px dashed rgba(255,255,255,.22);mask:linear-gradient(90deg,#000 88%,transparent)}
+    @keyframes plPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
+    .pl-title{font-family:'Oswald','Arial Black',sans-serif;font-size:22px;font-weight:800;letter-spacing:.42em;text-indent:.42em;color:#fff;text-transform:uppercase}
+    .pl-title b{background:linear-gradient(135deg,#a78bfa,#ec4899,#38bdf8);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:plShine 2.6s linear infinite}
+    @keyframes plShine{to{background-position:200% 0}}
+    .pl-bar{width:180px;height:5px;border-radius:99px;background:rgba(255,255,255,.09);overflow:hidden}
+    .pl-fill{width:0;height:100%;border-radius:99px;background:linear-gradient(90deg,#8b5cf6,#ec4899,#38bdf8);box-shadow:0 0 14px rgba(236,72,153,.6);transition:width .45s cubic-bezier(.4,0,.2,1)}
+    .loading-overlay .loading-text{margin:2px 0 0;text-align:center;max-width:80vw}
+    @media (prefers-reduced-motion: reduce){.pl-orb,.pl-emblem,.pl-title b{animation:none}}
 
     @media(max-width:768px){
       .player-header{padding:9px 8px;font-size:14px; height:44px;}
@@ -412,10 +420,17 @@
   <div class="player-main" id="playerMain">
     <iframe id="playerIframe" class="player-iframe" allow="autoplay; fullscreen; encrypted-media; picture-in-picture" referrerpolicy="origin"></iframe>
     <div class="loading-overlay" id="loadingOverlay">
-      <div class="spinner"></div>
-      <div class="loading-text">
-        <div class="loading-title" id="loadingTitle"></div>
-        <div class="loading-subtitle" id="loadingSubtitle"></div>
+      <!-- v204: тот же прелоадер, что на стартовой (orbs + эмблема F + прогресс),
+           вместо старого спиннера — единый стиль загрузки по всему сайту -->
+      <div class="pl-orb o1"></div><div class="pl-orb o2"></div><div class="pl-orb o3"></div>
+      <div class="pl-box">
+        <div class="pl-emblem"><div class="pl-strip"></div><span>F</span></div>
+        <div class="pl-title">Film<b>otiv</b></div>
+        <div class="pl-bar"><div class="pl-fill" id="plFill"></div></div>
+        <div class="loading-text">
+          <div class="loading-title" id="loadingTitle"></div>
+          <div class="loading-subtitle" id="loadingSubtitle"></div>
+        </div>
       </div>
     </div>
     <div class="toast" id="toast"></div>
@@ -501,6 +516,23 @@
       } else {
         loadingSubtitle.textContent = typeof t === 'function' ? t('playerLoading') : 'Загрузка плеера...';
       }
+    }
+
+    // v204: драйвер прогресса прелоадера плеера — плавный набор до 92%,
+    // при готовности (bridge_ready / ready) — 100%
+    var plFillEl = document.getElementById('plFill');
+    var plDone = false, plP = 8;
+    function playerLoaderDone() {
+      if (plDone) return;
+      plDone = true;
+      if (plFillEl) plFillEl.style.width = '100%';
+    }
+    if (plFillEl) {
+      var plTimer = setInterval(function () {
+        if (plDone || !document.body.contains(plFillEl)) { clearInterval(plTimer); return; }
+        plP = Math.min(92, plP + (plP < 55 ? 5 : 2));
+        plFillEl.style.width = plP + '%';
+      }, 260);
     }
 
     var tg = window.Telegram && window.Telegram.WebApp;
@@ -871,11 +903,13 @@
       if (data.type === 'bridge_ready') {
         console.log('[player] Bridge ready');
         __bridgeArrived = true; // сигнал успеха для edge-канала (poll)
+        playerLoaderDone();
         loadingOverlay.classList.add('hidden');
       }
       if (data.type === 'ready' || data.type === 'loaded') {
         playerReady = true;
         if (!playerReadyTime) playerReadyTime = Date.now();
+        playerLoaderDone();
         loadingOverlay.classList.add('hidden');
         if (typeof data.duration === 'number' && data.duration > 0) {
           lastKnownDuration = data.duration;

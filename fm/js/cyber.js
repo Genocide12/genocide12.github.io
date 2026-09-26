@@ -203,6 +203,7 @@
   var heroFilms = [];
   var heroIdx = 0;
   var heroTimer = null;
+  var heroReadySent = false; // v204: событие filmotiv:hero-ready шлётся один раз
 
   function heroBuild(films) {
     var hero = $('cyberHero');
@@ -274,6 +275,19 @@
       if (k < 0 || k >= slides.length) continue;
       var img = slides[k].querySelector('.cyber-hero-bg');
       if (img && img.getAttribute('data-src') && !img.getAttribute('src')) {
+        // v204 (владелец): прелоадер стартовой ждёт и постеры — сигнал
+        // «первый экран готов» уходит, когда активный фон героя загрузился
+        // (или окончательно не смог). Прелоадер ограничивает ожидание 4с
+        // после window.load, так что битый постер не блокирует показ.
+        if (k === i && !heroReadySent) {
+          heroReadySent = true;
+          var heroReady = function () {
+            try { document.dispatchEvent(new CustomEvent('filmotiv:hero-ready')); } catch (_) {}
+          };
+          img.addEventListener('load', heroReady, { once: true });
+          img.addEventListener('error', heroReady, { once: true });
+          if (img.complete) setTimeout(heroReady, 0);
+        }
         img.setAttribute('src', img.getAttribute('data-src'));
         img.removeAttribute('data-src');
       }
@@ -791,10 +805,30 @@
   }
 
   // ====== INIT ======
+  // v204: мобильный поиск — свёрнут до иконки 🔍, тап разворачивает
+  // (запрос владельца для мобильных и Telegram-приложения)
+  function initMobileSearch() {
+    var box = document.querySelector('.pm-search .search-container');
+    var input = $('searchInput');
+    if (!box || !input) return;
+    box.addEventListener('click', function (e) {
+      if (box.classList.contains('expanded')) return;
+      e.preventDefault();
+      box.classList.add('expanded');
+      try { input.focus(); } catch (_) {}
+    });
+    input.addEventListener('blur', function () {
+      setTimeout(function () {
+        if (!input.value) box.classList.remove('expanded');
+      }, 140);
+    });
+  }
+
   function init() {
     try { bindNav(); } catch (_) {}
     try { bindDrawer(); } catch (_) {}
     try { bindSearchView(); } catch (_) {} // FIX: переключение в режим поиска
+    try { initMobileSearch(); } catch (_) {} // v204: иконка поиска на мобиле
     try { renderRecent(); } catch (_) {} // «Последние фильмы» в рейле
     try { refreshFavButtons(); syncServerFavs(); } catch (_) {} // SYNC FIX: серверная коллекция в кнопки
     try { initSections(); } catch (_) {}

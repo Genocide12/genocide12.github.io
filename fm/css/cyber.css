@@ -1301,3 +1301,15 @@ body.light-theme .adhd-toast { background: rgba(8, 12, 30, .96); border-color: r
   .cyber-hero-slide, .cyber-card, .cyber-btn, .pm-chip, .cyber-chip, .gp-fav img { transition: none; }
   .fx-cube-loader span { animation: none; }
 }
+
+/* v204: мобильный поиск — в свёрнутом виде остаётся только значок 🔍,
+   тап по нему разворачивает строку (запрос владельца: мобильные + Telegram-приложение) */
+@media (max-width: 760px) {
+  .pm-search .search-container { width: 44px; min-width: 44px; padding: 2px 6px 2px 12px; border-radius: 22px; cursor: pointer; }
+  .pm-search .search-input { width: 0; padding-left: 0; padding-right: 0; opacity: 0; transition: opacity .2s ease; }
+  .pm-search .gp-kbd { display: none; }
+  .pm-search .search-clear { display: none !important; }
+  .pm-search .search-container.expanded { width: 100%; min-width: 0; cursor: text; }
+  .pm-search .search-container.expanded .search-input { width: 100%; opacity: 1; padding-right: 38px; }
+  .pm-search .search-container.expanded .search-clear { display: flex !important; }
+}
