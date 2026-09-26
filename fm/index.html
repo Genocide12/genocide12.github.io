@@ -129,6 +129,72 @@
   </script>
 </head>
 <body>
+  <!-- ===== Preloader (task 45): экран загрузки до полной готовности стартовой ===== -->
+  <style>
+    #preloader{position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;background:radial-gradient(120% 120% at 50% 0%,#0a0c1c 0%,#04050d 60%);transition:opacity .55s ease,visibility .55s ease}
+    #preloader.pl-done{opacity:0;visibility:hidden;pointer-events:none}
+    .pl-orb{position:absolute;border-radius:50%;filter:blur(70px);opacity:.5;animation:plFloat 12s ease-in-out infinite}
+    .pl-orb.o1{width:280px;height:280px;background:#8b5cf6;top:-60px;left:-40px}
+    .pl-orb.o2{width:240px;height:240px;background:#ec4899;bottom:-40px;right:-30px;animation-delay:-4s}
+    .pl-orb.o3{width:200px;height:200px;background:#38bdf8;top:45%;right:12%;opacity:.28;animation-delay:-8s}
+    @keyframes plFloat{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(28px,-22px) scale(1.08)}66%{transform:translate(-22px,18px) scale(.94)}}
+    .pl-emblem{position:relative;width:92px;height:92px;border-radius:26px;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,rgba(139,92,246,.22),rgba(236,72,153,.10));border:1px solid rgba(255,255,255,.14);box-shadow:0 0 42px rgba(139,92,246,.45),inset 0 1px 0 rgba(255,255,255,.18);animation:plPulse 2.2s ease-in-out infinite}
+    .pl-emblem span{font-size:44px;font-weight:900;letter-spacing:-.03em;background:linear-gradient(135deg,#a78bfa,#ec4899);-webkit-background-clip:text;background-clip:text;color:transparent}
+    .pl-strip{position:absolute;inset:6px;border-radius:20px;border:1px dashed rgba(255,255,255,.22);mask:linear-gradient(90deg,#000 88%,transparent)}
+    @keyframes plPulse{0%,100%{transform:scale(1);box-shadow:0 0 42px rgba(139,92,246,.45),inset 0 1px 0 rgba(255,255,255,.18)}50%{transform:scale(1.06);box-shadow:0 0 64px rgba(236,72,153,.55),inset 0 1px 0 rgba(255,255,255,.18)}}
+    .pl-title{font-family:'Oswald','Arial Black',sans-serif;font-size:26px;font-weight:800;letter-spacing:.42em;text-indent:.42em;color:#fff;text-transform:uppercase}
+    .pl-title b{background:linear-gradient(135deg,#a78bfa,#ec4899,#38bdf8);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:plShine 2.6s linear infinite}
+    @keyframes plShine{to{background-position:200% 0}}
+    .pl-status{font-size:12.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.55);min-height:16px;transition:opacity .25s}
+    .pl-bar{width:190px;height:5px;border-radius:99px;background:rgba(255,255,255,.09);overflow:hidden}
+    .pl-fill{width:0;height:100%;border-radius:99px;background:linear-gradient(90deg,#8b5cf6,#ec4899,#38bdf8);box-shadow:0 0 14px rgba(236,72,153,.6);transition:width .45s cubic-bezier(.4,0,.2,1)}
+    html.pl-loading{overflow:hidden}
+    html.pl-loading body{overflow:hidden}
+    @media (prefers-reduced-motion: reduce){.pl-orb,.pl-emblem,.pl-title b{animation:none}}
+  </style>
+  <div id="preloader" role="status" aria-label="Загрузка Filmotiv">
+    <div class="pl-orb o1"></div><div class="pl-orb o2"></div><div class="pl-orb o3"></div>
+    <div class="pl-emblem"><div class="pl-strip"></div><span>F</span></div>
+    <div class="pl-title">Film<b>otiv</b></div>
+    <div class="pl-bar"><div class="pl-fill" id="plFill"></div></div>
+    <div class="pl-status" id="plStatus">Включаем свет…</div>
+  </div>
+  <noscript><style>#preloader{display:none}</style></noscript>
+  <script>
+    (function () {
+      var el = document.getElementById('preloader');
+      var fill = document.getElementById('plFill');
+      var status = document.getElementById('plStatus');
+      var done = false, finished = false, p = 0;
+      document.documentElement.classList.add('pl-loading');
+      var phrases = ['Включаем свет…', 'Загружаем каталог…', 'Готовим постеры…', 'Почти готово…'];
+      var pi = 0;
+      var rot = setInterval(function () {
+        pi = (pi + 1) % phrases.length;
+        if (status) status.textContent = phrases[pi];
+      }, 950);
+      function setP(v) { p = Math.max(p, v); if (fill) fill.style.width = p + '%'; }
+      function finish() {
+        if (finished) return;
+        finished = true;
+        clearInterval(rot);
+        setTimeout(function () {
+          if (done) return;
+          done = true;
+          el.classList.add('pl-done');
+          document.documentElement.classList.remove('pl-loading');
+          setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 700);
+        }, 350);
+      }
+      setP(55);
+      if (document.readyState === 'complete') { setP(100); finish(); }
+      else window.addEventListener('load', function () { setP(100); finish(); }, { once: true });
+      if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { setP(85); });
+      // Failsafe: даже на самом медленном соединении экран уйдёт сам
+      setTimeout(function () { setP(100); finish(); }, 7000);
+    })();
+  </script>
+  <!-- ===== /Preloader ===== -->
   <!-- Living background — неоновое свечение кибер-города -->
   <div class="background" aria-hidden="true">
     <div class="orb one"></div>

@@ -1,10 +1,10 @@
-// Filmotiv Service Worker v192 (v192: относительные пути — работает и под /fm/ на зеркале;
-// player-skip через pathname.endsWith; резервный плеер удалён из player.html)
+// Filmotiv Service Worker v202 (v202: прелоадер стартовой страницы в index.html;
+// v192: относительные пути — работает и под /fm/ на зеркале; резервный плеер удалён)
 // SIMPLIFIED — does NOT intercept navigation requests.
 // Only caches static assets (JS/CSS/images) for offline.
 // HTML pages go directly to network — no SW interference.
 
-const CACHE_NAME = 'filmotiv-v199';
+const CACHE_NAME = 'filmotiv-v202';
 const STATIC_ASSETS = [
   'css/app.css',
   'css/cyber.css',
