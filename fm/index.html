@@ -176,8 +176,11 @@
       document.documentElement.classList.add('pl-loading');
       var phrases = ['Включаем свет…', 'Загружаем каталог…', 'Готовим постеры…', 'Почти готово…'];
       var pi = 0;
+      // v206 (владелец): надписи не зацикливаются — после «Почти готово…» новых
+      // надписей нет, она остаётся на экране до фактической загрузки страницы
       var rot = setInterval(function () {
-        pi = (pi + 1) % phrases.length;
+        if (pi >= phrases.length - 1) { clearInterval(rot); return; }
+        pi += 1;
         if (status) status.textContent = phrases[pi];
       }, 950);
       function setP(v) { p = Math.max(p, v); if (fill) fill.style.width = p + '%'; }
@@ -244,7 +247,14 @@
           if (fill) fill.style.width = '55%';
           if (st) st.textContent = msg || phrases[0];
           if (rot) clearInterval(rot);
-          rot = setInterval(function () { phI = (phI + 1) % phrases.length; if (st) st.textContent = phrases[phI]; }, 1100);
+          phI = 0; // каждый показ — с первой надписи (иначе после финальной цикл не возобновится)
+          // v206 (владелец): как и в стартовом прелоадере — без зацикливания,
+          // «Почти готово…» остаётся последней надписью до скрытия лоадера
+          rot = setInterval(function () {
+            if (phI >= phrases.length - 1) { clearInterval(rot); rot = null; return; }
+            phI += 1;
+            if (st) st.textContent = phrases[phI];
+          }, 1100);
           showT0 = Date.now();
         },
         hide: function (minMs) {
