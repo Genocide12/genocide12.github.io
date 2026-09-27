@@ -303,6 +303,7 @@
 
   var tg = null;
   var tgInitData = '';
+  var whoamiLastTs = 0; // v208: троттлинг whoamiSync (не чаще раза в 20с)
 
   App.AUTH = {
     getTg: function() { return tg; },
@@ -355,28 +356,103 @@
         // works on phone/desktop, no auth possible on TV.
         fixedBtn.classList.add('hidden');
         fixedBtn.classList.add('hidden-by-tv');
+      } else if (isLoggedIn) {
+        // v208 (владелец): у авторизованных кнопка «Открыть Telegram» на сайте
+        // БОЛЬШЕ НЕ НУЖНА — удаляем её, внизу футера остаётся бейдж
+        // «Доступно в Telegram». У неавторизованных кнопка входа остаётся.
+        fixedBtn.classList.add('hidden');
+        fixedBtn.onclick = null;
       } else {
         fixedBtn.classList.remove('hidden');
-        // v198: как в живом Genopoisk — гость по кнопке бара попадает на
-        // Telegram-вход (OIDC), а не в чат бота. Причина отказа от OAuth в
-        // v193 («Bot domain invalid») устранена: владелец выполнил
-        // /setdomain filmotiv.duckdns.org — страница входа проверена живьём.
-        // Залогиненным по-прежнему открываем бота (t.me?start=app).
-        if (isLoggedIn) {
-          if (fixedText) fixedText.textContent = 'Открыть Telegram';
-          fixedBtn.href = 'https://t.me/Filmotivbot?start=app';
-        } else {
-          // v205 (владелец): вернули официальный Telegram OAuth — открывается
-          // страница подтверждения Telegram («Вход через Telegram… Принять»),
-          // пользователь определяется автоматически, без ввода номера и без
-          // бота. guest_id переносит гостевую коллекцию в аккаунт (callback.js).
-          if (fixedText) fixedText.textContent = 'Войти через Telegram';
-          var guestId = '';
-          try { guestId = localStorage.getItem('filmotiv_user_id') || ''; } catch (_) {}
-          fixedBtn.href = '/api/auth/telegram/login' + (guestId.indexOf('web_') === 0 ? '?guest_id=' + encodeURIComponent(guestId) : '');
-        }
-        fixedBtn.onclick = null;
+        // v205 (владелец): вернули официальный Telegram OAuth — открывается
+        // страница подтверждения Telegram («Вход через Telegram… Принять»),
+        // пользователь определяется автоматически, без ввода номера и без
+        // бота. guest_id переносит гостевую коллекцию в аккаунт (callback.js).
+        if (fixedText) fixedText.textContent = 'Войти через Telegram';
+        var guestId = '';
+        try { guestId = localStorage.getItem('filmotiv_user_id') || ''; } catch (_) {}
+        fixedBtn.href = '/api/auth/telegram/login' + (guestId.indexOf('web_') === 0 ? '?guest_id=' + encodeURIComponent(guestId) : '');
+        // v208 (владелец: «сейчас страница с авторизацией открывается вместо
+        // сайта!»): вход открываем в МИНИ-ОКНЕ (попап 420×760), а не в текущей
+        // вкладке — сайт остаётся открытым. После успеха попап сам закроется
+        // (postMessage), сайт обновится уже вошедшим.
+        fixedBtn.onclick = function(e) {
+          e.preventDefault();
+          App.AUTH.openLoginPopup();
+        };
       }
+    },
+
+    // --- v208: вход в мини-окне (попапе) ---
+    // Браузер: window.open 420×760 → Telegram OAuth → callback ставит сессию
+    // и закрывает попап (postMessage 'filmotiv:login-ok') → сайт перезагружается
+    // уже вошедшим. Фолбэки: попап заблокирован → та же вкладка; PWA/standalone
+    // (iOS) и Mini App → сразу та же вкладка (попап в standalone открыл бы
+    // Safari и разорвал цепочку возврата).
+    openLoginPopup: function() {
+      var guestId = '';
+      try { guestId = localStorage.getItem('filmotiv_user_id') || ''; } catch (_) {}
+      var url = '/api/auth/telegram/login' + (guestId.indexOf('web_') === 0 ? '?guest_id=' + encodeURIComponent(guestId) + '&popup=1' : '?popup=1');
+      var standalone = false;
+      try {
+        standalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+                     window.navigator.standalone === true;
+      } catch (_) {}
+      var inTg = !!(tg && ((tg.initData && tg.initData.length > 0) || (tg.platform && tg.platform !== 'unknown')));
+      if (standalone || inTg) { window.location.href = url; return; }
+      var w = null;
+      try {
+        w = window.open(url, 'filmotiv_tg_login', 'width=420,height=760,menubar=no,toolbar=no,location=yes,status=no,resizable=yes,scrollbars=yes');
+      } catch (_) {}
+      if (!w) { window.location.href = url; return; } // попап заблокирован — фолбэк
+      try { if (w.focus) w.focus(); } catch (_) {}
+      // Наблюдатель: попап закрыли без postMessage (отмена или Telegram вернул
+      // в другую вкладку) — пере-проверяем сессию по cookie (whoamiSync).
+      var iv = setInterval(function() {
+        try { if (!w || w.closed) { clearInterval(iv); App.AUTH.whoamiSync({ force: true }); } }
+        catch (_) { clearInterval(iv); }
+      }, 700);
+      setTimeout(function() { clearInterval(iv); }, 180000);
+    },
+
+    // --- v208: cookie-first синхронизация входа (whoami) ---
+    // КОРЕНЬ бага «сайт всё равно говорит войти через телеграм»: сессия живёт
+    // в HttpOnly-cookie (tg_session), а UI определял вход ТОЛЬКО по localStorage
+    // (filmotiv_tg_user_id). После OIDC-входа cookie есть, а localStorage — нет
+    // (или он на другом домене: domain-migrate переводит vercel→duckdns уже
+    // ПОСЛЕ входа). Теперь при загрузке (и по возврату фокуса в таб) спрашиваем
+    // /api/me — сервер узнаёт пользователя по cookie — и синхронизируем
+    // localStorage + UI. Пользователь мгновенно видит себя вошедшим.
+    whoamiSync: async function(opts) {
+      opts = opts || {};
+      if (tg && tg.initData) return false; // Mini App — вход через initData
+      try { if (!opts.force && localStorage.getItem('filmotiv_tg_user_id')) return false; } catch (_) {}
+      var now = Date.now();
+      if (!opts.force && now - whoamiLastTs < 20000) return false; // троттлинг
+      whoamiLastTs = now;
+      try {
+        var uid = App.CORE.getUserId();
+        var res = await App.CORE.apiPost('/api/me', { userId: uid, initData: App.CORE.getTgInitData() });
+        if (!res || !res.ok) return false;
+        var data = await res.json();
+        if (data && data.exists && data.user_id && String(data.user_id).indexOf('web_') !== 0) {
+          var prevId = '';
+          try { prevId = localStorage.getItem('filmotiv_tg_user_id') || ''; } catch (_) {}
+          localStorage.setItem('filmotiv_tg_user_id', String(data.user_id));
+          if (data.username) localStorage.setItem('filmotiv_tg_username', String(data.username));
+          try { localStorage.removeItem('filmotiv_user_id'); } catch (_) {}
+          if (!prevId) {
+            // Состояние сменилось «гость → вошёл» — обновляем UI сразу
+            if (typeof data.is_premium !== 'undefined') App.AUTH.updatePremiumBadge(!!data.is_premium);
+            App.AUTH.checkTgLoginBar();
+            if (App.UI && App.UI.showToast) {
+              App.UI.showToast('✅ Вы вошли как ' + (data.username || 'Telegram') + ' — коллекция синхронизирована', 4500);
+            }
+          }
+          return true;
+        }
+      } catch (_) {}
+      return false;
     },
 
     // --- Premium badge (🔥) in hero title ---
@@ -569,6 +645,37 @@
       if (loader) loader.classList.add('hidden');
     },
 
+    // --- v208 (владелец): прелоадер при нажатии кнопок на сайте или поиске —
+    // ТОЛЬКО в поле блока карточек, без полноэкранного оверлея. Полноэкранный
+    // FilmotivLoader остаётся только на входе/обновлении главной страницы и
+    // в плеере. В сетке — shimmer-скелеты на месте будущих карточек.
+    showGridLoader: function() {
+      var content = document.getElementById('content');
+      if (content) content.classList.remove('hidden');
+      var grid = document.getElementById('filmGrid');
+      if (!grid) {
+        try { if (window.FilmotivLoader) window.FilmotivLoader.show(); } catch (_) {}
+        return;
+      }
+      grid.classList.remove('centered');
+      grid.classList.remove('random-mode');
+      var n = (window.innerWidth <= 768) ? 6 : 10;
+      var html = '';
+      for (var i = 0; i < n; i++) {
+        html += '<div class="film-card skel" aria-hidden="true"><div class="skel-poster"></div><div class="skel-line w60"></div><div class="skel-line w40"></div></div>';
+      }
+      grid.innerHTML = html;
+    },
+
+    hideGridLoader: function() {
+      var grid = document.getElementById('filmGrid');
+      if (!grid) return;
+      var sk = grid.querySelectorAll('.film-card.skel');
+      for (var i = 0; i < sk.length; i++) {
+        if (sk[i] && sk[i].parentNode) sk[i].parentNode.removeChild(sk[i]);
+      }
+    },
+
     showEmptyState: function(msg, icon) {
       var filmGrid = document.getElementById('filmGrid');
       if (filmGrid) {
@@ -632,6 +739,8 @@
     appendFilms: function(films, forceCenter) {
       var filmGrid = document.getElementById('filmGrid');
       if (!filmGrid) return;
+      // v208: скелет-карточки сеточного лоадера убираем перед отрисовкой
+      try { App.UI.hideGridLoader(); } catch (_) {}
       var SW = window.SW_CACHE_VERSION || '67';
       var isMobile = window.innerWidth <= 768;
       var eagerCount = isMobile ? 6 : 12;
@@ -1067,7 +1176,7 @@
       hasMore = true;
       filmBuffer = [];
       App.UI.clearFilms();
-      App.UI.showLoader();
+      App.UI.showGridLoader(); // v208: лоадер только в блоке карточек
       var searchInput = document.getElementById('searchInput');
       if (searchInput) searchInput.value = '';
       if (window.trackEvent) window.trackEvent('categories_opened', { category: category });
@@ -1077,14 +1186,14 @@
           var existingGrid = document.getElementById('filmGrid');
           if (currentCategory === 'random' && existingGrid && existingGrid.children.length > 0) {
             // Already in random mode — just swap the film, keep layout
-            App.UI.showLoader();
+            App.UI.showGridLoader();
             var film = await App.MOVIES.getRandomFilm();
             App.UI.clearFilms();
             if (film) App.UI.displayFilms([film], true);
             else App.UI.showEmptyState('Упс, не удалось загрузить случайный фильм 🎲 Попробуйте ещё раз!', '🎲');
           } else {
             // First time clicking random — normal flow
-            App.UI.showLoader();
+            App.UI.showGridLoader();
             var film = await App.MOVIES.getRandomFilm();
             if (film) App.UI.displayFilms([film], true);
             else App.UI.showEmptyState('Упс, не удалось загрузить случайный фильм 🎲 Попробуйте ещё раз!', '🎲');
@@ -1205,7 +1314,7 @@
       currentCategory = null;
       hasMore = false;
       App.UI.clearFilms();
-      App.UI.showLoader();
+      App.UI.showGridLoader(); // v208: лоадер только в блоке карточек
       // INSTANT load from cache — show cached films immediately, then
       // refresh in background if needed.
       var cacheKey = 'filmotiv_fav_cache';
@@ -1568,6 +1677,47 @@
   });
   setInterval(function() { if (!(tg && tg.initData)) App.AUTH.checkAuth(); }, 120000);
 
+  // v208 (владелец: «выполнена авторизация — сайт всё равно говорит войти»):
+  // cookie-first проверка сессии. Если вход уже выполнен (tg_session стоит,
+  // а localStorage пуст — например, сессия ставилась на другом домене или
+  // хранилище чистилось) — интерфейс сразу переводится во «вошедшее» состояние.
+  setTimeout(function() { App.AUTH.whoamiSync(); }, 400);
+  document.addEventListener('visibilitychange', function() {
+    if (document.visibilityState !== 'visible') return;
+    var hasLocalId = false;
+    try { hasLocalId = !!localStorage.getItem('filmotiv_tg_user_id'); } catch (_) {}
+    if (!hasLocalId) App.AUTH.whoamiSync();
+  });
+
+  // v208: приёмник сообщений попапа входа. Попап после успешного входа шлёт
+  // 'filmotiv:login-ok' и закрывается сам — здесь обновляем страницу.
+  window.addEventListener('message', function(e) {
+    try {
+      var d = e.data;
+      if (typeof d === 'string') { try { d = JSON.parse(d); } catch (_) { return; } }
+      if (!d || typeof d !== 'object') return;
+      if (d.type === 'filmotiv:login-ok') {
+        window.location.reload();
+      } else if (d.type === 'filmotiv:login-error') {
+        if (App.UI && App.UI.showToast) {
+          App.UI.showToast('⚠️ ' + (d.message || 'Не удалось войти — попробуйте ещё раз'), 6000);
+        }
+      }
+    } catch (_) {}
+  });
+
+  // v208: кнопка «🔑 Войти через Telegram» в пустой коллекции — тоже открываем
+  // в мини-окне (делегирование: блок перерисовывается динамически).
+  var gridForLogin = document.getElementById('filmGrid');
+  if (gridForLogin) {
+    gridForLogin.addEventListener('click', function(e) {
+      var a = e.target && e.target.closest ? e.target.closest('a.login-cta') : null;
+      if (!a) return;
+      e.preventDefault();
+      App.AUTH.openLoginPopup();
+    });
+  }
+
   // ====== Resume card setup ======
   var resumeClose = document.getElementById('resumeClose');
   if (resumeClose) {
@@ -1881,7 +2031,7 @@
       hideCategories();
       searchTimeout = setTimeout(async function() {
         App.UI.clearFilms();
-        App.UI.showLoader();
+        App.UI.showGridLoader(); // v208: лоадер только в блоке карточек
         try {
           // Поиск — не категория: сбрасываем, чтобы бесконечный скролл
           // не догружал прежнюю категорию под результаты поиска

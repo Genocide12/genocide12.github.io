@@ -17,6 +17,13 @@
 // watchRedirect() в api-origin.js. Входы для заблокированных:
 // filmotiv.duckdns.org или зеркало genocide12.github.io/fm/.
 //
+// v208 (владелец): «ссылки на версел должны быть только на приложение
+// телеграм! для браузера должна быть duckdns» — ЗЕРКАЛО правила:
+// (а) браузер на vercel → переезжает на duckdns (эта ветка, как и раньше);
+// (б) Telegram Mini App на vercel — НЕ переезжает: vercel теперь домен
+//     мини-аппа (BotFather → redirect/trusted origins, Menu Button).
+//     Определяем мини-апп по всем доступным сигналам: Telegram.WebApp,
+//     хеш #tgWebAppData (всегда есть в URL мини-аппа), UA Telegram.
 // Выход для отладки: ?nomigrate=1 в URL.
 (function () {
   'use strict';
@@ -24,6 +31,24 @@
   var TARGET_ORIGIN = 'https://filmotiv.duckdns.org';
   var host = '';
   try { host = window.location.hostname || ''; } catch (e) { return; }
+
+  // v208: внутри Telegram не переезжаем (мини-апп живёт на vercel)
+  function inTelegram() {
+    try {
+      var t = window.Telegram && window.Telegram.WebApp;
+      if (t && (t.initData || (t.platform && t.platform !== 'unknown'))) return true;
+    } catch (e) {}
+    try {
+      if ((window.location.hash || '').indexOf('#tgWebApp') === 0) return true;
+      if ((window.location.search || '').indexOf('tgWebAppData=') !== -1) return true;
+    } catch (e) {}
+    try {
+      var ua = navigator.userAgent || '';
+      if (ua.indexOf('Telegram') !== -1) return true;
+    } catch (e) {}
+    return false;
+  }
+  if (inTelegram()) return;
 
   var isVercelProd = host === 'filmotiv.vercel.app';
 

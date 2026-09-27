@@ -474,38 +474,15 @@
       if (!btn) return;
       function goHome(ev) {
         try { if (ev && ev.cancelable) { ev.preventDefault(); ev.stopPropagation(); } } catch (_) {}
-        // v207 (владелец: «плеер закрывается по крестику долго, секунды 1.5–2
-        // перед прелоадером»): прелоадер показывается МГНОВЕННО, синхронно в
-        // обработчике — тот же визуал, что при загрузке плеера (#loadingOverlay).
-        // Навигация на главную стартует через 2 кадра (гарантированная отрисовка
-        // оверлея), так что до прихода index.html пользователь уже видит экран
-        // загрузки, а не застывший плеер.
-        try {
-          var ov = document.getElementById('loadingOverlay');
-          if (ov) {
-            ov.classList.remove('hidden');
-            ov.style.opacity = '1';
-            ov.style.transition = 'none';
-            var sub = document.getElementById('loadingSubtitle');
-            if (sub) sub.textContent = 'Открываем каталог…';
-            var ttl = document.getElementById('loadingTitle');
-            if (ttl && !ttl.textContent) ttl.textContent = 'Filmotiv';
-          }
-        } catch (_) {}
-        var go = function () {
-          // КРЕСТИК ВСЕГДА закрывает плеер и возвращает на главную:
-          // не history.back (плеер мог открыться напрямую/из Telegram),
-          // а явный переход на корень текущего origin.
-          var home = 'index.html';
-          try { window.location.replace(home); } catch (e) {
-            try { window.location.href = home; } catch (_) {}
-          }
-        };
-        var raf = window.requestAnimationFrame || function (f) { setTimeout(f, 32); };
-        raf(function () { raf(go); });
-        // Страховка: если rAF подавлен (фоновая вкладка) — навигация всё равно
-        // стартует через 120мс
-        setTimeout(go, 120);
+        // v208 (владелец: «при выходе с плеера... убери прелоадер с названием
+        // фильма и надписью "открываем каталог" — за ним идет основной
+        // прелоадер, получается что 2 прелоадера»): промежуточный оверлей
+        // убран ПОЛНОСТЬЮ. Переходим на главную МГНОВЕННО, синхронно в
+        // обработчике — её собственный стартовый прелоадер подхватывает
+        // сразу, как только готов index.html. Двойного экрана больше нет.
+        try { window.location.replace('index.html'); } catch (e) {
+          try { window.location.href = 'index.html'; } catch (_) {}
+        }
       }
       btn.addEventListener('click', goHome);
       btn.addEventListener('touchend', function(e) { goHome(e); }, { passive: false });
@@ -1191,7 +1168,9 @@
     // смена режима/перезапуск (loadPlayer) отменяет текущую цепочку.
     function runOriginalChain(onDone) {
       var gen = __bgRetry.gen;
-      setProgress('Подключение к источнику…');
+      // v208 (владелец: «напиши внизу вместо "подключение к источнику..." —
+      // "Монтирую, монтирую, бл**ь"»): фирменная подпись плеера
+      setProgress('Монтирую, монтирую, бл**ь');
       tryEdgeProxy(7000).then(function(edgeOk) {
         if (gen !== __bgRetry.gen || __playStarted) return;
         if (edgeOk) {
@@ -1493,17 +1472,9 @@
     if (peRetry) peRetry.addEventListener('click', function() { hidePlayerError(); loadingOverlay.classList.remove('hidden'); loadPlayer(__bridgePremium); });
     var peClose = document.getElementById('peClose');
     if (peClose) peClose.addEventListener('click', function() {
-      // v207: тот же мгновенный прелоадер, что и у крестика шапки
-      try {
-        loadingOverlay.classList.remove('hidden');
-        loadingOverlay.style.opacity = '1';
-        loadingOverlay.style.transition = 'none';
-        var peSub = document.getElementById('loadingSubtitle');
-        if (peSub) peSub.textContent = 'Открываем каталог…';
-      } catch (_) {}
-      setTimeout(function () {
-        try { window.location.replace('index.html'); } catch (_) { window.location.href = 'index.html'; }
-      }, 60);
+      // v208: без промежуточного оверлея — сразу на главную
+      // (двойной прелоадер «открываем каталог» + стартовый убран)
+      try { window.location.replace('index.html'); } catch (_) { window.location.href = 'index.html'; }
     });
     // v193: подсказка «Нажмите play» — показ через 1.2с после загрузки
     // страницы; скрывается, когда видео РЕАЛЬНО стартовало (мост bridge.js

@@ -893,3 +893,45 @@ body.resizing *, body.resizing *::before, body.resizing *::after {
 @media (max-width: 959px) {
   .cyber-section, #content { scroll-margin-top: 148px; }
 }
+
+/* ====== v208: СКЕЛЕТ-ЛОАДЕР СЕТКИ (только в блоке карточек) ======
+   Владелец: при нажатии кнопок на сайте или поиске прелоадер должен быть
+   ТОЛЬКО в поле блока карточек фильмов (без полноэкранного оверлея).
+   Shimmer-плейсхолдеры занимают места будущих карточек — сетка «дышит». */
+.film-card.skel { pointer-events: none; }
+.film-card.skel .skel-poster {
+    width: 100%;
+    aspect-ratio: 2 / 3;
+    border-radius: 10px;
+    background: linear-gradient(100deg,
+        rgba(255,255,255,.055) 40%,
+        rgba(255,255,255,.13) 50%,
+        rgba(255,255,255,.055) 60%);
+    background-size: 200% 100%;
+    animation: skelShine 1.2s linear infinite;
+}
+.film-card.skel .skel-line {
+    height: 11px;
+    border-radius: 6px;
+    margin-top: 9px;
+    background: linear-gradient(100deg,
+        rgba(255,255,255,.05) 40%,
+        rgba(255,255,255,.11) 50%,
+        rgba(255,255,255,.05) 60%);
+    background-size: 200% 100%;
+    animation: skelShine 1.2s linear infinite;
+}
+.film-card.skel .skel-line.w60 { width: 62%; }
+.film-card.skel .skel-line.w40 { width: 42%; }
+@keyframes skelShine { to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) {
+    .film-card.skel .skel-poster, .film-card.skel .skel-line { animation: none; }
+}
+body.light-theme .film-card.skel .skel-poster,
+body.light-theme .film-card.skel .skel-line {
+    background: linear-gradient(100deg,
+        rgba(0,0,0,.06) 40%,
+        rgba(0,0,0,.13) 50%,
+        rgba(0,0,0,.06) 60%);
+    background-size: 200% 100%;
+}
