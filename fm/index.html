@@ -99,7 +99,7 @@
       else window.addEventListener('load', insertTgScript, { once: true });
     })();
   </script>
-  <link rel="stylesheet" href="css/app.css?v=194">
+  <link rel="stylesheet" href="css/app.css?v=206">
   <link rel="stylesheet" href="css/cyber.css?v=204">
   <!-- Structured Data for Search Engines (JSON-LD) -->
   <script type="application/ld+json">
@@ -172,7 +172,7 @@
       var MIN_SHOW = 0; // v206 (владелец): прелоадер не должен задерживать сайт —
       // экран уходит сразу, как только страница реально загружена (пол 350мс
       // внутри finish() оставлен только против мигания на быстрой сети)
-      var loadFired = false, loadFiredAt = 0, heroFired = false;
+      var loadFired = false, loadFiredAt = 0;
       document.documentElement.classList.add('pl-loading');
       var phrases = ['Включаем свет…', 'Загружаем каталог…', 'Готовим постеры…', 'Почти готово…'];
       var pi = 0;
@@ -184,14 +184,13 @@
         if (status) status.textContent = phrases[pi];
       }, 950);
       function setP(v) { p = Math.max(p, v); if (fill) fill.style.width = p + '%'; }
-      // Ждём не только window.load, но и первый постер героя (cyber.js шлёт
-      // событие filmotiv:hero-ready, когда активный фон загружен) — владелец:
-      // «не меньше времени загрузки всех элементов, особенно постеров».
+      // v206 (владелец: «ускорить хотя бы до 3 секунд»): замер показал, что
+      // постеры грузятся по 2.5–3.3с каждый и тянут за собой window.load —
+      // прелоадер висел 7–9с. Ждём только готовности DOM (defer-скрипты к
+      // этому моменту выполнены), постеры и герой докатываются после снятия
+      // экрана — сетка показывает скелетоны, картинки вливаются потоково.
       function maybeFinish() {
         if (!loadFired) return;
-        // Ждём герой-постер максимум 1.2с после load (v206: было 4с —
-        // прелоадер висел заметно дольше фактической загрузки страницы)
-        if (!heroFired && Date.now() - loadFiredAt < 1200) return;
         finish();
       }
       function finish() {
@@ -214,15 +213,12 @@
         setP(100);
         maybeFinish();
       }
-      if (document.readyState === 'complete') onLoad();
-      else window.addEventListener('load', onLoad, { once: true });
-      document.addEventListener('filmotiv:hero-ready', function () {
-        heroFired = true;
-        maybeFinish();
-      });
+      if (document.readyState !== 'loading') onLoad();
+      else document.addEventListener('DOMContentLoaded', onLoad, { once: true });
+      document.addEventListener('filmotiv:hero-ready', function () { setP(92); });
       if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { setP(85); });
-      // Failsafe: даже на самом медленном соединении экран уйдёт сам
-      setTimeout(function () { loadFired = true; setP(100); finish(); }, 7000);
+      // Failsafe: экран уйдёт сам максимум через 3с (владелец: «хотя бы до 3 секунд»)
+      setTimeout(function () { loadFired = true; setP(100); finish(); }, 3000);
     })();
     // ===== Универсальный лоадер контента (категории, коллекция, поиск) —
     // тот же визуал, что у стартового прелоадера. Старый кубический #loader
@@ -268,6 +264,39 @@
           }, wait);
         }
       };
+    })();
+  </script>
+  <script>
+    // v206 (владелец): oauth.telegram.org работает в виджет-моде (origin
+    // обязателен — проверено) и возвращает браузер на корень сайта с
+    // #tgAuthResult=<base64 JSON>. Фрагмент до сервера не доходит, поэтому
+    // сайт сам отправляет его на /api/auth/telegram/widget — там подпись
+    // проверяется по схеме Login Widget, создаётся tg_session и страница
+    // перезагружается уже входом. Без этого хендлера кнопка выглядела как
+    // «просто обновление сайта».
+    (function () {
+      try {
+        var m = /(?:^|&)tgAuthResult=([^&]+)/.exec(location.hash.substring(1));
+        if (!m) return;
+        var b64 = m[1].replace(/-/g, '+').replace(/_/g, '/');
+        while (b64.length % 4) b64 += '=';
+        var payload = JSON.parse(new TextDecoder().decode(
+          Uint8Array.from(atob(b64), function (c) { return c.charCodeAt(0); })
+        ));
+        if (history.replaceState) history.replaceState(null, '', location.pathname + location.search);
+        try {
+          var gid = localStorage.getItem('filmotiv_user_id');
+          if (gid && gid.indexOf('web_') === 0) payload.guest_id = gid;
+        } catch (_) {}
+        fetch('/api/auth/telegram/widget', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        }).then(function (r) { return r.json(); }).then(function (j) {
+          if (j && j.ok) location.reload();
+          else console.warn('[tg] widget login failed:', j && j.error);
+        }).catch(function (e) { console.warn('[tg] widget login error:', e); });
+      } catch (_) {}
     })();
   </script>
   <!-- ===== /Preloader ===== -->

@@ -512,6 +512,10 @@ a { color: #c4b5fd; }
 }
 .empty-icon { font-size: 58px; margin-bottom: 14px; }
 .empty-text { color: var(--muted); font-size: 14px; line-height: 1.55; }
+/* v206 (владелец): блок входа/пустого состояния растягивается на всю ширину
+   поля — внутри .film-grid (CSS grid) он без этого правила занимает одну
+   колонку и выглядит узким */
+.film-grid .empty-state { grid-column: 1 / -1; }
 /* v194: блок входа в пустой коллекции — две кнопки (OIDC + бот) и подсказки */
 .empty-text .login-cta {
     display: inline-flex; align-items: center; justify-content: center; gap: 8px;
