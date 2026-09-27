@@ -172,31 +172,41 @@
       var MIN_SHOW = 0; // v206 (владелец): прелоадер не должен задерживать сайт —
       // экран уходит сразу, как только страница реально загружена (пол 350мс
       // внутри finish() оставлен только против мигания на быстрой сети)
-      var loadFired = false, loadFiredAt = 0;
+      var loadFired = false, loadFiredAt = 0, loadEvt = false;
       document.documentElement.classList.add('pl-loading');
       var phrases = ['Включаем свет…', 'Загружаем каталог…', 'Готовим постеры…', 'Почти готово…'];
       var pi = 0;
       // v206 (владелец): надписи не зацикливаются — после «Почти готово…» новых
-      // надписей нет, она остаётся на экране до фактической загрузки страницы
+      // надписей нет; интервал 700мс — все 4 фразы успевают показаться (~2.1с)
       var rot = setInterval(function () {
         if (pi >= phrases.length - 1) { clearInterval(rot); return; }
         pi += 1;
         if (status) status.textContent = phrases[pi];
-      }, 950);
+      }, 700);
       function setP(v) { p = Math.max(p, v); if (fill) fill.style.width = p + '%'; }
-      // v206 (владелец: «ускорить хотя бы до 3 секунд»): замер показал, что
-      // постеры грузятся по 2.5–3.3с каждый и тянут за собой window.load —
-      // прелоадер висел 7–9с. Ждём только готовности DOM (defer-скрипты к
-      // этому моменту выполнены), постеры и герой докатываются после снятия
-      // экрана — сетка показывает скелетоны, картинки вливаются потоково.
+      // v206 (владелец: «сначала загрузились постеры, потом закрывался прелоадер»):
+      // ждём постеры ПЕРВОГО ЭКРАНА сетки (loading=eager) — нижние (lazy) грузятся
+      // при скролле и ожидания не требуют. Пока каталог не отрисован — ждём его.
+      function postersDone() {
+        var eager = document.querySelectorAll('#filmGrid img.film-poster[loading="eager"]');
+        if (eager.length === 0) {
+          if (loadEvt) return true; // страница целиком загрузилась — ждать нечего
+          var grid = document.getElementById('filmGrid');
+          return !!(grid && grid.querySelectorAll('img.film-poster').length > 0);
+        }
+        for (var i = 0; i < eager.length; i++) { if (!eager[i].complete) return false; }
+        return true;
+      }
       function maybeFinish() {
         if (!loadFired) return;
+        if (!postersDone()) return;
         finish();
       }
+      var watch = setInterval(maybeFinish, 250);
       function finish() {
         if (finished) return;
         finished = true;
-        clearInterval(rot);
+        clearInterval(rot); clearInterval(watch);
         // Держим экран минимум MIN_SHOW от старта, затем плавно убираем
         var wait = Math.max(350, MIN_SHOW - (Date.now() - t0));
         setTimeout(function () {
@@ -208,17 +218,18 @@
         }, wait);
       }
       setP(55);
-      function onLoad() {
+      function onDom() {
         loadFired = true; loadFiredAt = Date.now();
-        setP(100);
+        setP(85);
         maybeFinish();
       }
-      if (document.readyState !== 'loading') onLoad();
-      else document.addEventListener('DOMContentLoaded', onLoad, { once: true });
+      if (document.readyState !== 'loading') onDom();
+      else document.addEventListener('DOMContentLoaded', onDom, { once: true });
+      window.addEventListener('load', function () { loadEvt = true; setP(100); maybeFinish(); }, { once: true });
       document.addEventListener('filmotiv:hero-ready', function () { setP(92); });
       if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { setP(85); });
-      // Failsafe: экран уйдёт сам максимум через 3с (владелец: «хотя бы до 3 секунд»)
-      setTimeout(function () { loadFired = true; setP(100); finish(); }, 3000);
+      // Failsafe: экран уйдёт сам максимум через 8с — даже если постеры зависли
+      setTimeout(function () { loadFired = true; loadEvt = true; setP(100); finish(); }, 8000);
     })();
     // ===== Универсальный лоадер контента (категории, коллекция, поиск) —
     // тот же визуал, что у стартового прелоадера. Старый кубический #loader
