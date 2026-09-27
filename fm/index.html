@@ -169,7 +169,9 @@
       var status = document.getElementById('plStatus');
       var done = false, finished = false, p = 0;
       var t0 = Date.now();
-      var MIN_SHOW = 1200; // (владелец) минимум 1.2с — на быстрой сети экран не должен мигать
+      var MIN_SHOW = 0; // v206 (владелец): прелоадер не должен задерживать сайт —
+      // экран уходит сразу, как только страница реально загружена (пол 350мс
+      // внутри finish() оставлен только против мигания на быстрой сети)
       var loadFired = false, loadFiredAt = 0, heroFired = false;
       document.documentElement.classList.add('pl-loading');
       var phrases = ['Включаем свет…', 'Загружаем каталог…', 'Готовим постеры…', 'Почти готово…'];
@@ -184,7 +186,9 @@
       // «не меньше времени загрузки всех элементов, особенно постеров».
       function maybeFinish() {
         if (!loadFired) return;
-        if (!heroFired && Date.now() - loadFiredAt < 4000) return;
+        // Ждём герой-постер максимум 1.2с после load (v206: было 4с —
+        // прелоадер висел заметно дольше фактической загрузки страницы)
+        if (!heroFired && Date.now() - loadFiredAt < 1200) return;
         finish();
       }
       function finish() {
@@ -485,7 +489,7 @@
   })();
   </script>
   <!-- Fixed "Open in Telegram" button — only on browser (NOT in Mini App) -->
-  <a href="https://t.me/Filmotivbot?start=app" target="_blank" rel="noopener" id="fixedTelegramBtn">
+  <a href="https://t.me/Filmotivbot?start=app" rel="noopener" id="fixedTelegramBtn">
     <span id="fixedTelegramText">Открыть Telegram</span>
   </a>
   <script>
@@ -529,7 +533,7 @@
   <!-- ADHD OS micro-interactions (confetti, toasts, haptics) -->
   <script defer src="js/adhd-os.js?v=191"></script>
   <!-- All JS bundled into one file (core + device + auth + ui + movies + tracking + app) -->
-  <script defer src="js/app.js?v=204"></script>
+  <script defer src="js/app.js?v=205"></script>
   <!-- Neon dashboard: сайдбар, герой, секции, жанры, рейл, режим поиска -->
   <script defer src="js/cyber.js?v=204"></script>
 </body>
