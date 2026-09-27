@@ -935,3 +935,110 @@ body.light-theme .film-card.skel .skel-line {
         rgba(0,0,0,.06) 60%);
     background-size: 200% 100%;
 }
+
+/* ====== v209: СЕТОЧНЫЙ ПРЕЛОАДЕР (внутри блока карточек) ======
+   Владелец: «прелоадеры пропали — я же просил оставить прелоадеры при поиске
+   и переходе по категориям, но засунуть прелоадер в поле блоков карточек
+   фильмов». Скелеты v208 владелец прелоадером не считал — теперь в сетке
+   стоит НАСТОЯЩИЙ прелоадер в стиле FilmotivLoader (орбы + эмблема F +
+   надписи + прогресс), но не на весь экран, а внутри поля карточек. */
+.grid-preloader {
+    grid-column: 1 / -1;
+    position: relative;
+    overflow: hidden;
+    min-height: 340px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    border-radius: 18px;
+    background: radial-gradient(120% 120% at 50% 0%, rgba(139,92,246,.10) 0%, rgba(4,5,13,.92) 60%);
+    border: 1px solid rgba(255,255,255,.07);
+}
+.glp-orb {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(46px);
+    opacity: .42;
+    animation: glpFloat 11s ease-in-out infinite;
+    pointer-events: none;
+}
+.glp-o1 { width: 190px; height: 190px; background: #8b5cf6; top: -50px; left: -30px; }
+.glp-o2 { width: 160px; height: 160px; background: #ec4899; bottom: -40px; right: -20px; animation-delay: -4s; }
+.glp-o3 { width: 130px; height: 130px; background: #38bdf8; top: 42%; right: 14%; opacity: .24; animation-delay: -8s; }
+@keyframes glpFloat {
+    0%, 100% { transform: translate(0,0) scale(1); }
+    33% { transform: translate(22px,-16px) scale(1.07); }
+    66% { transform: translate(-18px,14px) scale(.94); }
+}
+.glp-emblem {
+    position: relative;
+    width: 64px;
+    height: 64px;
+    border-radius: 19px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, rgba(139,92,246,.24), rgba(236,72,153,.12));
+    border: 1px solid rgba(255,255,255,.15);
+    box-shadow: 0 0 30px rgba(139,92,246,.45), inset 0 1px 0 rgba(255,255,255,.18);
+    animation: glpPulse 2.2s ease-in-out infinite;
+}
+.glp-emblem span {
+    font-size: 30px;
+    font-weight: 900;
+    letter-spacing: -.03em;
+    background: linear-gradient(135deg, #a78bfa, #ec4899);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+@keyframes glpPulse {
+    0%, 100% { transform: scale(1); box-shadow: 0 0 30px rgba(139,92,246,.45), inset 0 1px 0 rgba(255,255,255,.18); }
+    50% { transform: scale(1.07); box-shadow: 0 0 46px rgba(236,72,153,.55), inset 0 1px 0 rgba(255,255,255,.18); }
+}
+.glp-status {
+    font-size: 12.5px;
+    font-weight: 700;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,.62);
+    min-height: 16px;
+    text-align: center;
+    padding: 0 18px;
+}
+.glp-bar {
+    width: 170px;
+    height: 5px;
+    border-radius: 99px;
+    background: rgba(255,255,255,.09);
+    overflow: hidden;
+}
+.glp-fill {
+    width: 40%;
+    height: 100%;
+    border-radius: 99px;
+    background: linear-gradient(90deg, #8b5cf6, #ec4899, #38bdf8);
+    box-shadow: 0 0 14px rgba(236,72,153,.6);
+    animation: glpSweep 1.6s cubic-bezier(.4,0,.2,1) infinite;
+}
+@keyframes glpSweep {
+    0% { width: 12%; }
+    60% { width: 78%; }
+    100% { width: 92%; }
+}
+@media (max-width: 768px) {
+    .grid-preloader { min-height: 260px; border-radius: 14px; }
+    .glp-o1 { width: 140px; height: 140px; }
+    .glp-o2 { width: 120px; height: 120px; }
+    .glp-o3 { width: 100px; height: 100px; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .glp-orb, .glp-emblem, .glp-fill { animation: none; }
+}
+body.light-theme .grid-preloader {
+    background: radial-gradient(120% 120% at 50% 0%, rgba(139,92,246,.08) 0%, rgba(248,249,252,.95) 60%);
+    border-color: rgba(0,0,0,.08);
+}
+body.light-theme .glp-status { color: rgba(20,20,30,.6); }

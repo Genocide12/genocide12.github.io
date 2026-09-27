@@ -99,7 +99,7 @@
       else window.addEventListener('load', insertTgScript, { once: true });
     })();
   </script>
-  <link rel="stylesheet" href="css/app.css?v=208">
+  <link rel="stylesheet" href="css/app.css?v=209">
   <link rel="stylesheet" href="css/cyber.css?v=205">
   <!-- Structured Data for Search Engines (JSON-LD) -->
   <script type="application/ld+json">
@@ -550,19 +550,29 @@
     }, { passive: true });
   })();
   </script>
-  <!-- Fixed "Open in Telegram" button — only on browser (NOT in Mini App) -->
-  <a href="https://t.me/Filmotivbot?start=app" rel="noopener" id="fixedTelegramBtn">
+  <!-- Fixed "Open in Telegram" button — only on browser (NOT in Mini App).
+       v209 (владелец): target=_blank — даже при устаревшем кеше app.js клик
+       по кнопке НЕ заменяет сайт, а открывает новую вкладку/окно. -->
+  <a href="https://t.me/Filmotivbot?start=app" rel="noopener" id="fixedTelegramBtn" target="_blank">
     <span id="fixedTelegramText">Открыть Telegram</span>
   </a>
   <script>
     // Hide "Open in Telegram" button if running inside Telegram Mini App.
     // User is already in Telegram — no need to show this button.
     // Check multiple signals: Telegram.WebApp object, UA string, URL params.
+    // v209 (владелец: «у авторизованных не показывай баннер войти/открыть
+    // через телеграм») — синхронная проверка localStorage ДО первой отрисовки:
+    // авторизованный никогда не видит вспышку кнопки входа (проверка не ждёт
+    // app.js). У гостей кнопка появляется сразу — DOM ещё парсится.
     (function() {
       try {
+        var authed = false;
+        try {
+          authed = !!(localStorage.getItem('filmotiv_tg_user_id') || localStorage.getItem('filmotiv_tg_username'));
+        } catch (_) {}
         var t = window.Telegram && window.Telegram.WebApp;
         var ua = navigator.userAgent || '';
-        var inTelegram = false;
+        var inTelegram = authed;
         if (t && (t.initData || (t.platform && t.platform !== 'unknown'))) {
           inTelegram = true;
         }
@@ -595,7 +605,7 @@
   <!-- ADHD OS micro-interactions (confetti, toasts, haptics) -->
   <script defer src="js/adhd-os.js?v=191"></script>
   <!-- All JS bundled into one file (core + device + auth + ui + movies + tracking + app) -->
-  <script defer src="js/app.js?v=208"></script>
+  <script defer src="js/app.js?v=209"></script>
   <!-- Neon dashboard: сайдбар, герой, секции, жанры, рейл, режим поиска -->
   <script defer src="js/cyber.js?v=205"></script>
 </body>

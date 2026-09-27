@@ -404,7 +404,13 @@
       try {
         w = window.open(url, 'filmotiv_tg_login', 'width=420,height=760,menubar=no,toolbar=no,location=yes,status=no,resizable=yes,scrollbars=yes');
       } catch (_) {}
-      if (!w) { window.location.href = url; return; } // попап заблокирован — фолбэк
+      if (!w) {
+        // v209 (владелец: «ссылка должна открываться в новом окне, а не в той
+        // же вкладке»): попап заблокирован — пробуем новую вкладку, и лишь если
+        // заблокировано и это (на практике почти никогда) — та же вкладка.
+        try { w = window.open(url, '_blank'); } catch (_) {}
+        if (!w) { window.location.href = url; return; }
+      }
       try { if (w.focus) w.focus(); } catch (_) {}
       // Наблюдатель: попап закрыли без postMessage (отмена или Telegram вернул
       // в другую вкладку) — пере-проверяем сессию по cookie (whoamiSync).
@@ -645,10 +651,19 @@
       if (loader) loader.classList.add('hidden');
     },
 
-    // --- v208 (владелец): прелоадер при нажатии кнопок на сайте или поиске —
-    // ТОЛЬКО в поле блока карточек, без полноэкранного оверлея. Полноэкранный
-    // FilmotivLoader остаётся только на входе/обновлении главной страницы и
-    // в плеере. В сетке — shimmer-скелеты на месте будущих карточек.
+    // --- v209 (владелец: «прелоадеры пропали, я же просил оставить прелоадеры
+    // при поиске и переходе по категориям, но засунуть прелоадер в поле блоков
+    // карточек фильмов») — в сетке показывается НАСТОЯЩИЙ прелоадер в стиле
+    // FilmotivLoader (орбы + эмблема F + надписи + прогресс), но НЕ на весь
+    // экран, а ВНУТРИ блока карточек. Полноэкранный FilmotivLoader остаётся
+    // только на входе/обновлении главной страницы и в плеере.
+    // Минимальное время показа 900мс — прелоадер виден даже при мгновенной
+    // загрузке из кеша (gridLoaderGate удерживает отрисовку карточек).
+    _gridLoaderAt: 0,
+    _gridRot: null,
+    GRID_LOADER_MIN: 900,
+    GRID_PHRASES: ['Загружаем каталог…', 'Готовим постеры…', 'Почти готово…'],
+
     showGridLoader: function() {
       var content = document.getElementById('content');
       if (content) content.classList.remove('hidden');
@@ -659,24 +674,50 @@
       }
       grid.classList.remove('centered');
       grid.classList.remove('random-mode');
-      var n = (window.innerWidth <= 768) ? 6 : 10;
-      var html = '';
-      for (var i = 0; i < n; i++) {
-        html += '<div class="film-card skel" aria-hidden="true"><div class="skel-poster"></div><div class="skel-line w60"></div><div class="skel-line w40"></div></div>';
-      }
-      grid.innerHTML = html;
+      this._gridLoaderAt = Date.now();
+      grid.innerHTML = '<div class="grid-preloader" role="status" aria-label="Загрузка каталога">' +
+        '<div class="glp-orb glp-o1"></div><div class="glp-orb glp-o2"></div><div class="glp-orb glp-o3"></div>' +
+        '<div class="glp-emblem"><span>F</span></div>' +
+        '<div class="glp-status">' + this.GRID_PHRASES[0] + '</div>' +
+        '<div class="glp-bar"><div class="glp-fill"></div></div>' +
+        '</div>';
+      if (this._gridRot) clearInterval(this._gridRot);
+      var phrases = this.GRID_PHRASES, self = this, pi = 0;
+      // надписи не зацикливаются — «Почти готово…» остаётся до скрытия
+      this._gridRot = setInterval(function() {
+        if (pi >= phrases.length - 1) { clearInterval(self._gridRot); self._gridRot = null; return; }
+        pi += 1;
+        var st = grid.querySelector('.glp-status');
+        if (st) st.textContent = phrases[pi];
+      }, 500);
     },
 
     hideGridLoader: function() {
+      if (this._gridRot) { clearInterval(this._gridRot); this._gridRot = null; }
+      this._gridLoaderAt = 0;
       var grid = document.getElementById('filmGrid');
       if (!grid) return;
-      var sk = grid.querySelectorAll('.film-card.skel');
-      for (var i = 0; i < sk.length; i++) {
-        if (sk[i] && sk[i].parentNode) sk[i].parentNode.removeChild(sk[i]);
+      var gl = grid.querySelector('.grid-preloader');
+      if (gl && gl.parentNode) gl.parentNode.removeChild(gl);
+    },
+
+    // v209: держит прелоадер в сетке минимум GRID_LOADER_MIN мс. Сам лоадер
+    // НЕ убирает — его убирает appendFilms/showEmptyState, когда карточки
+    // уже готовы, иначе между «минимумом» и приходом данных сетка пустовала.
+    // Вызывается параллельно с запросом (или перед отрисовкой из кеша).
+    // Если лоадер не показывался (например, дозагрузка при скролле) — no-op.
+    gridLoaderGate: async function() {
+      if (!this._gridLoaderAt) return;
+      var wait = this.GRID_LOADER_MIN - (Date.now() - this._gridLoaderAt);
+      if (wait > 0 && wait < 3000) {
+        await new Promise(function(r) { setTimeout(r, wait); });
       }
     },
 
     showEmptyState: function(msg, icon) {
+      // v209: убираем сеточный прелоадер (и его ротацию надписей) перед
+      // заменой содержимого сетки
+      try { App.UI.hideGridLoader(); } catch (_) {}
       var filmGrid = document.getElementById('filmGrid');
       if (filmGrid) {
         var ic = icon || '🎬';
@@ -727,7 +768,11 @@
     // Use appendFilms() directly to ADD films without clearing (used by infinite scroll).
     displayFilms: function(films, forceCenter) {
       if (!films || films.length === 0) {
-        if (document.getElementById('filmGrid').children.length === 0) {
+        // v209: сетка «пустая» = нет карточек (прелоадер/скелеты не в счёт) —
+        // иначе пустой результат поиска оставлял лоадер висеть навсегда
+        var g0 = document.getElementById('filmGrid');
+        var hasRealCards = g0 && g0.querySelectorAll('.film-card:not(.skel)').length > 0;
+        if (!g0 || g0.children.length === 0 || !hasRealCards) {
           App.UI.showEmptyState('По вашему запросу фильмов не найдено 🤔 Попробуйте найти что-нибудь другое!', '🔍');
         }
         return;
@@ -739,7 +784,7 @@
     appendFilms: function(films, forceCenter) {
       var filmGrid = document.getElementById('filmGrid');
       if (!filmGrid) return;
-      // v208: скелет-карточки сеточного лоадера убираем перед отрисовкой
+      // v209: сеточный прелоадер (если ещё показан) убираем перед отрисовкой
       try { App.UI.hideGridLoader(); } catch (_) {}
       var SW = window.SW_CACHE_VERSION || '67';
       var isMobile = window.innerWidth <= 768;
@@ -1182,22 +1227,13 @@
       if (window.trackEvent) window.trackEvent('categories_opened', { category: category });
       try {
         if (category === 'random') {
-          // Don't clear films if already showing a random film — just replace it
-          var existingGrid = document.getElementById('filmGrid');
-          if (currentCategory === 'random' && existingGrid && existingGrid.children.length > 0) {
-            // Already in random mode — just swap the film, keep layout
-            App.UI.showGridLoader();
-            var film = await App.MOVIES.getRandomFilm();
-            App.UI.clearFilms();
-            if (film) App.UI.displayFilms([film], true);
-            else App.UI.showEmptyState('Упс, не удалось загрузить случайный фильм 🎲 Попробуйте ещё раз!', '🎲');
-          } else {
-            // First time clicking random — normal flow
-            App.UI.showGridLoader();
-            var film = await App.MOVIES.getRandomFilm();
-            if (film) App.UI.displayFilms([film], true);
-            else App.UI.showEmptyState('Упс, не удалось загрузить случайный фильм 🎲 Попробуйте ещё раз!', '🎲');
-          }
+          // v209: единый поток «случайного фильма» (прежде ветка с dead-условием
+          // children.length > 0 всегда была истинной после showGridLoader)
+          var film = await App.MOVIES.getRandomFilm();
+          await App.UI.gridLoaderGate();
+          App.UI.clearFilms();
+          if (film) App.UI.displayFilms([film], true);
+          else App.UI.showEmptyState('Упс, не удалось загрузить случайный фильм 🎲 Попробуйте ещё раз!', '🎲');
         } else {
           // Cache-first: show cached films instantly
           // НО НЕ для «новинок» — четверговый список должен быть свежим
@@ -1207,6 +1243,10 @@
             if (cachedRaw) {
               var cached = JSON.parse(cachedRaw);
               if (cached && cached.films && cached.films.length > 0 && (Date.now() - cached.ts < 7 * 24 * 60 * 60 * 1000)) {
+                // v209: прелоадер в блоке карточек виден минимум 900мс даже при
+                // мгновенном кеше — по правилу владельца «прелоадер при переходе
+                // по категориям должен быть виден в поле карточек»
+                await App.UI.gridLoaderGate();
                 if (window.innerWidth <= 768) {
                   var showNow = cached.films.slice(0, MOBILE_INITIAL);
                   filmBuffer = cached.films.slice(showNow.length);
@@ -1246,6 +1286,10 @@
       }
       isLoading = true;
       try {
+        // v209: gate идёт ПАРАЛЛЕЛЬНО с запросом — прелоадер в сетке виден
+        // минимум 900мс, но сетевая задержка НЕ суммируется с минимумом.
+        // При дозагрузке по скроллу лоадера нет — gate мгновенный no-op.
+        var gateP = App.UI.gridLoaderGate();
         var films = [];
         if (currentCategory === 'popular') films = await App.MOVIES.getPopular(currentPage);
         else if (currentCategory === 'films') films = await App.MOVIES.getFilms(currentPage);
@@ -1256,6 +1300,7 @@
 
         // Показываем только фильмы, которые реально есть в плеере
         films = await App.MOVIES.filterAvailable(films);
+        await gateP; // v209: минимальный показ прелоадера до отрисовки
 
         if (films.length > 0) {
           try {
@@ -1263,7 +1308,9 @@
           } catch (_) {}
           currentPage++;
           if (window.innerWidth <= 768) {
-            var isFirstLoad = document.getElementById('filmGrid').children.length === 0 || document.getElementById('filmGrid').querySelector('.empty-state');
+            // v209: «первая загрузка» = нет карточек (прелоадер не в счёт),
+            // иначе мобильный первый экран показывал MOBILE_CHUNK вместо INITIAL
+            var isFirstLoad = document.getElementById('filmGrid').querySelectorAll('.film-card:not(.skel)').length === 0 || document.getElementById('filmGrid').querySelector('.empty-state');
             var showNow = isFirstLoad ? films.slice(0, MOBILE_INITIAL) : films.slice(0, MOBILE_CHUNK);
             filmBuffer = films.slice(showNow.length);
             App.UI.appendFilms(showNow);
@@ -1273,7 +1320,10 @@
         } else {
           hasMore = false;
           App.UI.updateLoadMoreBtn();
-          if (document.getElementById('filmGrid').children.length === 0) App.UI.showEmptyState('По вашему запросу фильмов не найдено 🤔 Попробуйте найти что-нибудь другое!', '🔍');
+          // v209: «пустая» сетка = нет карточек (прелоадер не в счёт)
+          var fg0 = document.getElementById('filmGrid');
+          var noCards = !fg0 || fg0.querySelectorAll('.film-card:not(.skel)').length === 0;
+          if (noCards && !(fg0 && fg0.querySelector('.empty-state'))) App.UI.showEmptyState('По вашему запросу фильмов не найдено 🤔 Попробуйте найти что-нибудь другое!', '🔍');
         }
       } catch (e) {
         // Network errors (ERR_CONNECTION_RESET, AbortError) are common on
@@ -1289,6 +1339,7 @@
         } catch (_) {}
         if (cachedFilms && cachedFilms.length > 0) {
           currentPage++;
+          await gateP; // v209: минимальный показ прелоадера
           App.UI.appendFilms(cachedFilms);
         } else {
           // Only show error if grid is EMPTY — if films already shown (from
@@ -1297,7 +1348,8 @@
           // убивала пагинацию ( symptom: «грузится только по 20 фильмов»).
           // Следующий скролл/клик по «Показать ещё» повторит попытку.
           var filmGrid = document.getElementById('filmGrid');
-          if (filmGrid && filmGrid.children.length === 0) {
+          if (filmGrid && filmGrid.querySelectorAll('.film-card:not(.skel)').length === 0 && !filmGrid.querySelector('.empty-state')) {
+            await gateP; // v209: минимальный показ прелоадера
             App.UI.showEmptyState('Ой, что-то пошло не так 😅 Попробуйте обновить страницу', '⚠️');
             hasMore = true; // следующая попытка возможна
           } else {
@@ -1314,7 +1366,7 @@
       currentCategory = null;
       hasMore = false;
       App.UI.clearFilms();
-      App.UI.showGridLoader(); // v208: лоадер только в блоке карточек
+      App.UI.showGridLoader(); // v209: прелоадер внутри блока карточек
       // INSTANT load from cache — show cached films immediately, then
       // refresh in background if needed.
       var cacheKey = 'filmotiv_fav_cache';
@@ -1323,6 +1375,7 @@
         if (cached) {
           var cachedFilms = JSON.parse(cached);
           if (cachedFilms && cachedFilms.length > 0) {
+            await App.UI.gridLoaderGate(); // v209: минимальный показ прелоадера
             App.UI.displayFilms(cachedFilms);
           }
         }
@@ -1347,8 +1400,9 @@
           // кнопка «Принять» на странице Telegram, пользователь определяется
           // автоматически. guest_id переносит гостевую коллекцию.
           var loginUrl = '/api/auth/telegram/login' + (guestId.indexOf('web_') === 0 ? '?guest_id=' + encodeURIComponent(guestId) : '');
+          // v209: target=_blank — даже без JS сайта клик не заменяет страницу
           var loginHtml = 'Войдите через Telegram, чтобы видеть свою коллекцию ❤️<br>' +
-            '<a class="login-cta" href="' + loginUrl + '">🔑 Войти через Telegram</a>' +
+            '<a class="login-cta" href="' + loginUrl + '" target="_blank" rel="noopener">🔑 Войти через Telegram</a>' +
             '<span class="login-hint">Telegram покажет экран подтверждения — просто нажмите «Принять».<br>Коллекция, история и премиум едины на сайте и в мини-аппе</span>';
           if (data.is_guest) {
             App.UI.showEmptyState(loginHtml, '🔑');
@@ -2031,16 +2085,17 @@
       hideCategories();
       searchTimeout = setTimeout(async function() {
         App.UI.clearFilms();
-        App.UI.showGridLoader(); // v208: лоадер только в блоке карточек
+        App.UI.showGridLoader(); // v209: прелоадер внутри блока карточек
         try {
           // Поиск — не категория: сбрасываем, чтобы бесконечный скролл
           // не догружал прежнюю категорию под результаты поиска
           App.MOVIES.setCategory(null);
           App.MOVIES.resetPagination();
           var films = await App.MOVIES.searchFilms(query);
+          await App.UI.gridLoaderGate(); // v209: прелоадер виден минимум 900мс
           App.UI.displayFilms(films, films.length === 1);
           App.TRACKING.trackEvent('searches', { query: query });
-        } catch (e) { App.UI.showEmptyState('Поиск не сработал 😅 Попробуйте другой запрос', '🔍'); }
+        } catch (e) { await App.UI.gridLoaderGate(); App.UI.showEmptyState('Поиск не сработал 😅 Попробуйте другой запрос', '🔍'); }
       }, 250);
     });
 
