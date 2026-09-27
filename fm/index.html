@@ -564,6 +564,17 @@
     // через телеграм») — синхронная проверка localStorage ДО первой отрисовки:
     // авторизованный никогда не видит вспышку кнопки входа (проверка не ждёт
     // app.js). У гостей кнопка появляется сразу — DOM ещё парсится.
+    // v210 (владелец: «кнопка "доступно в телеграм" тоже пропадает после
+    // авторизации! я же специально говорил чтобы ты ее не тронул, в отличии
+    // от динамичной кнопки войти в телеграм») — РЕГРЕССИЯ v209 ИСПРАВЛЕНА:
+    // авторизация в браузере больше НЕ считается «внутри Telegram». Раньше
+    // вошедшим ошибочно ставился body.in-tg, и CSS-правило
+    // body.in-tg .pm-tg-btn { display:none!important } прятало футерную
+    // кнопку «Доступно в Telegram» у всех авторизованных в браузере.
+    // Теперь: authed → прячем ТОЛЬКО динамическую кнопку входа
+    // (#fixedTelegramBtn); настоящий Mini App (WebApp-объект/UA) → прячем
+    // кнопку и ставим in-tg (внутри Telegram футерная кнопка по-прежнему
+    // не нужна — пользователь уже в Telegram).
     (function() {
       try {
         var authed = false;
@@ -572,17 +583,23 @@
         } catch (_) {}
         var t = window.Telegram && window.Telegram.WebApp;
         var ua = navigator.userAgent || '';
-        var inTelegram = authed;
-        if (t && (t.initData || (t.platform && t.platform !== 'unknown'))) {
-          inTelegram = true;
-        }
+        // Настоящий Telegram Mini App: WebApp-объект с initData/платформой
+        // или UA содержит Telegram. Факт авторизации (authed) сюда НЕ входит.
+        var inTelegram = !!(t && (t.initData || (t.platform && t.platform !== 'unknown')));
         // Fallback: check UA for Telegram (works even if script not loaded yet)
         if (ua.indexOf('Telegram') !== -1 || ua.indexOf('telegram') !== -1) {
           inTelegram = true;
         }
-        if (inTelegram) {
+        if (authed || inTelegram) {
+          // Прячется ТОЛЬКО динамическая кнопка «Войти/Открыть Telegram».
+          // Футерная «Доступно в Telegram» остаётся видимой всегда (вне TG).
           var btn = document.getElementById('fixedTelegramBtn');
           if (btn) btn.style.display = 'none';
+        }
+        // in-tg ставится ТОЛЬКО настоящему Mini App: класс управляет не только
+        // кнопкой, но и футером («Доступно в Telegram» скрыта внутри Telegram)
+        // и нижними отступами. Авторизованный в браузере — обычный браузер.
+        if (inTelegram) {
           // Marks Mini App mode for CSS: drops the extra 120px bottom gap
           // reserved for the fixed button in the browser.
           document.body.classList.add('in-tg');
