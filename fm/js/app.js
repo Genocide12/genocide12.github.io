@@ -366,12 +366,14 @@
           if (fixedText) fixedText.textContent = 'Открыть Telegram';
           fixedBtn.href = 'https://t.me/Filmotivbot?start=app';
         } else {
-          // v204 (владелец): OIDC-страница в браузере без Telegram-сессии
-          // требует ввода номера телефона. Гость теперь уходит сразу в бота:
-          // Telegram узнаёт его мгновенно, вход — большой кнопкой START,
-          // затем кнопка «Открыть в браузере» из бота завершает привязку.
+          // v205 (владелец): вернули официальный Telegram OAuth — открывается
+          // страница подтверждения Telegram («Вход через Telegram… Принять»),
+          // пользователь определяется автоматически, без ввода номера и без
+          // бота. guest_id переносит гостевую коллекцию в аккаунт (callback.js).
           if (fixedText) fixedText.textContent = 'Войти через Telegram';
-          fixedBtn.href = 'https://t.me/Filmotivbot?start=login';
+          var guestId = '';
+          try { guestId = localStorage.getItem('filmotiv_user_id') || ''; } catch (_) {}
+          fixedBtn.href = '/api/auth/telegram/login' + (guestId.indexOf('web_') === 0 ? '?guest_id=' + encodeURIComponent(guestId) : '');
         }
         fixedBtn.onclick = null;
       }
@@ -1225,13 +1227,13 @@
           // текст и пользователь не находил, как связать сайт с мини-аппом)
           var guestId = '';
           try { guestId = localStorage.getItem('filmotiv_user_id') || ''; } catch (_) {}
-          // v204: вход одной кнопкой — через бота (Telegram узнаёт пользователя
-          // сразу, без формы номера телефона). start=login запускает в боте
-          // сценарий «Привязка устройства» с кнопкой открытия сайта.
-          var loginUrl = 'https://t.me/Filmotivbot?start=login';
+          // v205 (владелец): вход через официальный Telegram OAuth — одна
+          // кнопка «Принять» на странице Telegram, пользователь определяется
+          // автоматически. guest_id переносит гостевую коллекцию.
+          var loginUrl = '/api/auth/telegram/login' + (guestId.indexOf('web_') === 0 ? '?guest_id=' + encodeURIComponent(guestId) : '');
           var loginHtml = 'Войдите через Telegram, чтобы видеть свою коллекцию ❤️<br>' +
             '<a class="login-cta" href="' + loginUrl + '">🔑 Войти через Telegram</a>' +
-            '<span class="login-hint">Telegram откроется и узнает вас сразу — подтвердите вход кнопкой START.<br>Коллекция, история и премиум едины на сайте и в мини-аппе</span>';
+            '<span class="login-hint">Telegram покажет экран подтверждения — просто нажмите «Принять».<br>Коллекция, история и премиум едины на сайте и в мини-аппе</span>';
           if (data.is_guest) {
             App.UI.showEmptyState(loginHtml, '🔑');
           } else if (data.reauth) {
