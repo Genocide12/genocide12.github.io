@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Filmotiv — как это работает · инфографика</title>
+<style>
+:root{
+  --bg:#08080d; --glass:rgba(255,255,255,.055); --glass2:rgba(255,255,255,.09);
+  --border:rgba(255,255,255,.10); --border2:rgba(255,255,255,.18);
+  --txt:#eef0ff; --mut:#9aa3c7; --mut2:#6d7699;
+  --purple:#8b5cf6; --pink:#ec4899; --blue:#38bdf8; --green:#34d399; --amber:#fbbf24;
+  --grad:linear-gradient(135deg,var(--purple),var(--pink));
+  --grad2:linear-gradient(90deg,var(--purple),var(--blue));
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,'Liberation Mono',monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--txt);font:16px/1.65 'Segoe UI',system-ui,-apple-system,Roboto,Arial,sans-serif;overflow-x:hidden}
+::selection{background:rgba(139,92,246,.45)}
+::-webkit-scrollbar{width:10px}::-webkit-scrollbar-thumb{background:linear-gradient(180deg,var(--purple),var(--pink));border-radius:99px}
+::-webkit-scrollbar-track{background:#0c0c14}
+/* фоновые орбы */
+.orbs{position:fixed;inset:0;z-index:-2;overflow:hidden;pointer-events:none}
+.orb{position:absolute;border-radius:50%;filter:blur(90px);opacity:.32;animation:drift 26s ease-in-out infinite alternate}
+.orb:nth-child(1){width:560px;height:560px;background:#8b5cf6;top:-180px;left:-120px}
+.orb:nth-child(2){width:480px;height:480px;background:#ec4899;top:30%;right:-160px;animation-delay:-8s}
+.orb:nth-child(3){width:520px;height:520px;background:#38bdf8;bottom:-200px;left:22%;animation-delay:-15s;opacity:.22}
+@keyframes drift{from{transform:translate(0,0) scale(1)}to{transform:translate(60px,50px) scale(1.12)}}
+.wrap{max-width:1180px;margin:0 auto;padding:0 22px}
+/* ---------- HERO ---------- */
+.hero{padding:84px 0 40px;text-align:center;position:relative}
+.logo{font-family:'Oswald','Segoe UI',sans-serif;font-weight:700;font-size:clamp(52px,9vw,104px);letter-spacing:.04em;line-height:1;
+  background:linear-gradient(135deg,#a78bfa 0%,#ec4899 55%,#38bdf8 110%);-webkit-background-clip:text;background-clip:text;color:transparent;
+  filter:drop-shadow(0 0 34px rgba(139,92,246,.45))}
+.tag{margin:18px auto 0;max-width:760px;font-size:clamp(17px,2.4vw,22px);color:#cdd3f2}
+.tag b{color:#fff}
+.hero-chips{margin-top:22px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.hchip{border:1px solid var(--border2);background:var(--glass);border-radius:99px;padding:8px 16px;font-size:13.5px;color:#cdd3f2}
+.hchip b{color:#fff}
+/* счётчики */
+.stats{margin:44px auto 0;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;max-width:980px}
+.stat{background:var(--glass);border:1px solid var(--border);border-radius:20px;padding:22px 12px 18px;position:relative;overflow:hidden;transition:transform .25s,box-shadow .25s}
+.stat:hover{transform:translateY(-4px);box-shadow:0 14px 40px rgba(139,92,246,.22)}
+.stat:after{content:'';position:absolute;inset:0;background:var(--grad);opacity:.06}
+.stat .num{font-family:'Oswald','Segoe UI',sans-serif;font-size:clamp(30px,4.6vw,44px);font-weight:700;background:var(--grad2);-webkit-background-clip:text;background-clip:text;color:transparent}
+.stat .lbl{font-size:12.5px;color:var(--mut);margin-top:4px;letter-spacing:.04em;text-transform:uppercase}
+/* ---------- SECTIONS ---------- */
+section{padding:64px 0 8px}
+.sec-head{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:10px}
+.sec-title{font-family:'Oswald','Segoe UI',sans-serif;font-size:clamp(26px,4.4vw,40px);font-weight:700;letter-spacing:.02em}
+.sec-title em{font-style:normal;background:var(--grad2);-webkit-background-clip:text;background-clip:text;color:transparent}
+.sec-sub{color:var(--mut);max-width:820px;margin-bottom:26px}
+/* быстрые карточки */
+.quick{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px}
+.qcard{background:var(--glass);border:1px solid var(--border);border-radius:22px;padding:22px 20px;transition:transform .25s,border-color .25s,box-shadow .25s}
+.qcard:hover{transform:translateY(-5px);border-color:rgba(139,92,246,.5);box-shadow:0 16px 44px rgba(139,92,246,.18)}
+.qcard .qic{font-size:30px}
+.qcard h3{font-size:16.5px;margin:10px 0 6px}
+.qcard p{font-size:14px;color:var(--mut)}
+/* путь фильма */
+.journey{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;position:relative}
+.jstep{background:var(--glass);border:1px solid var(--border);border-radius:20px;padding:18px 14px;position:relative;transition:transform .25s,border-color .25s}
+.jstep:hover{transform:translateY(-5px);border-color:rgba(56,189,248,.55)}
+.jstep .jn{position:absolute;top:-12px;left:14px;width:26px;height:26px;border-radius:50%;background:var(--grad);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;box-shadow:0 0 18px rgba(236,72,153,.5)}
+.jstep .jic{font-size:26px;margin:6px 0 6px}
+.jstep h4{font-size:14.5px;margin-bottom:5px}
+.jstep p{font-size:12.5px;color:var(--mut);line-height:1.5}
+.jarrow{position:absolute;top:50%;right:-13px;width:14px;height:2px;background:var(--grad2);z-index:2}
+.jstep:last-child .jarrow{display:none}
+@media(max-width:960px){.journey{grid-template-columns:1fr 1fr}.jstep:nth-child(2n) .jarrow{display:none}.jarrow{display:none}}
+@media(max-width:560px){.journey{grid-template-columns:1fr}}
+/* функции */
+.toolbar{position:sticky;top:0;z-index:50;background:rgba(8,8,13,.82);backdrop-filter:blur(14px);border:1px solid var(--border);border-radius:18px;padding:12px;margin:8px 0 20px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.search{flex:1 1 240px;display:flex;align-items:center;gap:9px;background:var(--glass2);border:1px solid var(--border);border-radius:12px;padding:9px 14px}
+.search input{flex:1;background:none;border:none;outline:none;color:var(--txt);font-size:14.5px}
+.search .sic{color:var(--mut)}
+.chip{border:1px solid var(--border2);background:var(--glass);border-radius:99px;padding:8px 14px;font-size:13px;color:#cdd3f2;cursor:pointer;transition:all .2s;user-select:none}
+.chip:hover{border-color:var(--purple)}
+.chip.on{background:var(--grad);border-color:transparent;color:#fff;box-shadow:0 6px 20px rgba(139,92,246,.4)}
+.fcount{font-size:12.5px;color:var(--mut2);margin-left:auto}
+.fgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px;align-items:start}
+.fcard{background:var(--glass);border:1px solid var(--border);border-radius:22px;overflow:hidden;transition:border-color .25s,box-shadow .25s,transform .25s;scroll-margin-top:90px}
+.fcard:hover{border-color:rgba(139,92,246,.45)}
+.fcard.open{border-color:rgba(139,92,246,.7);box-shadow:0 18px 50px rgba(139,92,246,.2);background:rgba(139,92,246,.06)}
+.fhead{padding:18px 18px 14px;cursor:pointer;user-select:none}
+.fhead .frow{display:flex;align-items:center;gap:10px;margin-bottom:9px}
+.fbadge{font-size:11px;letter-spacing:.05em;text-transform:uppercase;border:1px solid var(--border2);border-radius:99px;padding:3px 10px;color:var(--mut)}
+.fnum{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--mut2)}
+.fname{font-size:17.5px;font-weight:700;line-height:1.35}
+.ffile{font-family:var(--mono);font-size:11.5px;color:var(--blue);margin-top:7px;word-break:break-all}
+.fbody{max-height:0;overflow:hidden;transition:max-height .45s ease}
+.fcard.open .fbody{max-height:2200px}
+.finner{padding:0 18px 18px;border-top:1px dashed var(--border2);margin:0 0 0}
+.fsig{font-family:var(--mono);font-size:12px;color:var(--amber);background:rgba(251,191,36,.07);border:1px solid rgba(251,191,36,.22);border-radius:10px;padding:8px 12px;margin:14px 0 12px;word-break:break-all}
+.fstory{font-size:14.5px;color:#d6daf5;line-height:1.72}
+.fstory b{color:#fff}
+.fcode{margin-top:14px;border-radius:14px;border:1px solid var(--border);background:#0a0a12;position:relative}
+.fcode .cbhead{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border);font-size:11px;color:var(--mut2)}
+.fcode .cbhead .dots{display:flex;gap:5px}
+.fcode .cbhead .dots i{width:9px;height:9px;border-radius:50%;display:block}
+.fcode pre{margin:0;padding:13px 14px;overflow-x:auto;font-family:var(--mono);font-size:12px;line-height:1.62;color:#c9d1e9;white-space:pre}
+.fcode pre .cm{color:#5b6486}.fcode pre .kw{color:#c792ea}.fcode pre .st{color:#a5d6a7}
+.fhint{font-size:11.5px;color:var(--mut2);margin-top:9px}
+.fhint b{color:#a78bfa}
+/* два дома */
+.homes{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:820px){.homes{grid-template-columns:1fr}}
+.home{border-radius:24px;padding:26px 24px;border:1px solid var(--border);background:var(--glass);position:relative;overflow:hidden}
+.home:before{content:'';position:absolute;top:-60px;right:-60px;width:180px;height:180px;border-radius:50%;filter:blur(60px);opacity:.35;background:var(--hc)}
+.home h3{font-family:var(--mono);font-size:19px;color:var(--hc)}
+.home .hrole{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);margin:4px 0 16px}
+.home ul{list-style:none}
+.home li{padding:9px 0 9px 26px;position:relative;font-size:14px;color:#d6daf5;border-top:1px dashed var(--border)}
+.home li:first-child{border-top:none}
+.home li:before{content:'▸';position:absolute;left:4px;color:var(--hc)}
+/* сравнение */
+.cmp{border:1px solid var(--border);border-radius:24px;overflow:hidden}
+.cmp-row{display:grid;grid-template-columns:1fr 1fr 1fr;border-top:1px solid var(--border)}
+.cmp-row:first-child{border-top:none}
+.cmp-row>div{padding:15px 18px;font-size:14px}
+.cmp-row.head>div{background:rgba(139,92,246,.14);font-weight:700;font-size:14.5px}
+.cmp-row .ck{color:var(--mut);font-size:13px}
+.cmp-row .cbad{color:#f0a0b8}
+.cmp-row .cgood{color:#9be8c5}
+@media(max-width:760px){.cmp-row{grid-template-columns:1fr}.cmp-row.head{display:none}.cmp-row>div{border-top:1px dashed var(--border)}}
+/* таймлайн */
+.timeline{position:relative;margin-left:8px;padding-left:30px}
+.timeline:before{content:'';position:absolute;left:0;top:6px;bottom:6px;width:2px;background:var(--grad2);opacity:.5}
+.tl-item{position:relative;padding:0 0 26px}
+.tl-item:before{content:'';position:absolute;left:-36px;top:8px;width:12px;height:12px;border-radius:50%;background:var(--grad);box-shadow:0 0 16px rgba(236,72,153,.6)}
+.tl-item .tv{font-family:var(--mono);font-weight:700;color:var(--pink);font-size:14px}
+.tl-item .tt{font-weight:700;font-size:16px;margin:2px 0 4px}
+.tl-item .td{font-size:13.5px;color:var(--mut);max-width:820px}
+/* футер */
+.foot{margin-top:70px;padding:34px 0 44px;border-top:1px solid var(--border);text-align:center;color:var(--mut2);font-size:13px}
+.foot .fpkm{color:#a78bfa}
+/* контекстное меню / тост */
+.ctx{position:fixed;z-index:999;min-width:220px;background:#101018;border:1px solid var(--border2);border-radius:14px;padding:6px;display:none;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+.ctx.show{display:block;animation:pop .12s ease}
+@keyframes pop{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:scale(1)}}
+.ctx button{display:flex;width:100%;align-items:center;gap:10px;background:none;border:none;color:var(--txt);font-size:13.5px;padding:9px 12px;border-radius:9px;cursor:pointer;text-align:left}
+.ctx button:hover{background:rgba(139,92,246,.2)}
+.toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(20px);background:var(--grad);color:#fff;padding:11px 22px;border-radius:99px;font-size:14px;font-weight:600;opacity:0;pointer-events:none;transition:all .3s;z-index:1000;box-shadow:0 12px 40px rgba(236,72,153,.45)}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+/* reveal */
+.reveal{opacity:0;transform:translateY(26px);transition:opacity .7s ease,transform .7s ease}
+.reveal.vis{opacity:1;transform:none}
+@media(prefers-reduced-motion:reduce){.reveal{opacity:1;transform:none;transition:none}}
+</style>
+</head>
+<body>
+<div class="orbs"><i class="orb"></i><i class="orb"></i><i class="orb"></i></div>
+
+<header class="wrap hero">
+  <div class="logo">FILMOTIV</div>
+  <p class="tag">Онлайн-кинотеатр в один клик: каталог Кинопоиска, плеер <b>без рекламы</b>, вход через Telegram — <b>без пароля</b> и без VPN.</p>
+  <div class="hero-chips">
+    <span class="hchip">🚫 Реклама вырезается до загрузки</span>
+    <span class="hchip">🔐 Вход — один тап</span>
+    <span class="hchip">⚡ Первый экран ~1.3с</span>
+    <span class="hchip">📱 Браузер · PWA · Telegram</span>
+  </div>
+  <div class="stats" id="stats"></div>
+</header>
+
+<main class="wrap">
+
+<section id="quick">
+  <div class="sec-head"><h2 class="sec-title">Filmotiv <em>за 30 секунд</em></h2></div>
+  <p class="sec-sub">Пять фактов, после которых понятно всё — даже если вы никогда не видели исходный код.</p>
+  <div class="quick" id="quickGrid"></div>
+</section>
+
+<section id="journey">
+  <div class="sec-head"><h2 class="sec-title">Путь фильма: <em>от клика до кадра</em></h2></div>
+  <p class="sec-sub">Что происходит за те полторы секунды между нажатием «Смотреть» и первым кадром. Каждый шаг закреплён за реальными функциями проекта.</p>
+  <div class="journey" id="journeyGrid"></div>
+</section>
+
+<section id="funcs">
+  <div class="sec-head"><h2 class="sec-title">Ключевые функции <em>по винтикам</em></h2></div>
+  <p class="sec-sub">Не безликий список — только <b style="color:#fff">важное</b>: вход через Telegram, блокировка рекламы, добыча каталога, скорость. У каждой функции — подробное объяснение, как она устроена. Клик по карточке раскрывает разбор и настоящий код.</p>
+  <div class="toolbar">
+    <div class="search"><span class="sic">🔎</span><input id="q" type="text" placeholder="Поиск: реклама, вход, прокси, кеш…" autocomplete="off"></div>
+    <div id="chips" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+    <span class="fcount" id="fcount"></span>
+  </div>
+  <div class="fgrid" id="fgrid"></div>
+</section>
+
+<section id="homes">
+  <div class="sec-head"><h2 class="sec-title">Два дома <em>Filmotiv</em></h2></div>
+  <p class="sec-sub">Правило владельца: vercel — только для приложения Telegram, браузер — только duckdns. За каждым адресом закреплена своя роль.</p>
+  <div class="homes" id="homesGrid"></div>
+</section>
+
+<section id="compare">
+  <div class="sec-head"><h2 class="sec-title">Обычный плеер-прокси <em>против Filmotiv</em></h2></div>
+  <p class="sec-sub">Разница не в «ещё одном сайте с фильмами», а в инженерных решениях на каждом шаге.</p>
+  <div class="cmp" id="cmpGrid"></div>
+</section>
+
+<section id="timeline">
+  <div class="sec-head"><h2 class="sec-title">Как мы сюда пришли</h2></div>
+  <p class="sec-sub">127 публичных версий за месяц с небольшим — от первого релиза 24 августа до починки последней кнопки. Хроника восстановлена по ченджлогу проекта; попало сюда только то, что работает в Filmotiv сегодня.</p>
+  <div class="timeline" id="tlGrid"></div>
+</section>
+
+<footer class="foot">
+  <p>💡 Клик по карточке раскрывает разбор · ПКМ по коду — меню копирования (<span class="fpkm">Копировать код / имя / описание</span>)</p>
+  <p style="margin-top:8px">Инфографика собрана вне репозитория проекта · Filmotiv · 27.09.2026</p>
+</footer>
+</main>
+
+<div class="ctx" id="ctx"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+const GMETA = [{"id": "auth", "title": "Вход через Telegram", "icon": "🔐", "hint": "Как сайт узнаёт вас и не теряет коллекцию"}, {"id": "ads", "title": "Фильм без рекламы", "icon": "🎬", "hint": "Как плеер достаёт кино и вырезает роллы"}, {"id": "data", "title": "Каталог и данные", "icon": "🗂️", "hint": "Как карточки фильмов добываются быстрее"}, {"id": "site", "title": "Сайт и скорость", "icon": "⚡", "hint": "Как сайт открывается мгновенно и живёт на двух доменах"}];
+const FUNCS = [{"i": 0, "group": "auth", "name": "Выдаёт билет в очередь к Telegram", "file": "api/auth/telegram/login.js", "sig": "module.exports = async (req, res)", "story": "Вы нажимаете «Войти через Telegram» — и первым в работу вступает эта функция. Она бросает «монетку»: генерирует два случайных секрета (state и code_verifier). Один прячется в защищённой cookie браузера, второй уезжает к Telegram в виде хэш-отпечатка (code_challenge) — потом только владелец отпечатка сможет обменять код входа, подделка невозможна. Туда же в cookie она кладёт ваш гостевой id (чтобы коллекция «до входа» не потерялась) и флаг «вход из мини-окна». Если запрос пришёл не с зарегистрированного в Telegram домена, функция не спорит, а мгновенно переправляет вас на правильный вход (hop на vercel) — поэтому вход работает и с duckdns, и с vercel, и из мини-аппа.", "code": "// Generate state and PKCE code verifier\nconst state = base64url(crypto.randomBytes(32));\nconst codeVerifier = base64url(crypto.randomBytes(32));\nconst codeChallenge = base64url(\n  crypto.createHash('sha256').update(codeVerifier).digest()\n);\n\n// Store state + verifier in HttpOnly cookies\nconst stateCookie = [\n  `tg_oauth_state=${encodeURIComponent(state)}`,\n  'Max-Age=600', 'Path=/', 'HttpOnly', 'SameSite=Lax',\n  isProduction ? 'Secure' : ''\n].filter(Boolean).join('; ');\n\n// Гость НЕ с vercel → hop на зарегистрированный вход\nif (registeredOrigin && requestOrigin &&\n    requestOrigin.replace(/\\/$/, '') !== registeredOrigin) {\n  return res.redirect(302, registeredOrigin +\n    '/api/auth/telegram/login' + (hopQuery.length ? '?' + hopQuery.join('&') : ''));\n}\n\nres.redirect(302, targetUrl); // oauth.telegram.org (OIDC + PKCE)", "icon": "🔐", "gtitle": "Вход через Telegram"}, {"i": 1, "group": "auth", "name": "Проверяет пропуск у входа", "file": "api/auth/telegram/callback.js", "sig": "module.exports = async (req, res)", "story": "После подтверждения в Telegram браузер возвращается с разовым «пропуском» — кодом. Функция сверяет state из адресной строки с тем, что спрятан в cookie: сравнение в constant-time, чтобы злоумышленник не мог подобрать значение по скорости ответа. Затем код обменивается на настоящий JWT-токен у oauth.telegram.org, и его подпись проверяется секретом из BotFather. Тонкий момент: в токене Telegram два разных id — sub (внутренний номер OIDC) и id (настоящий Telegram-номер). Здесь берётся именно id — благодаря этому мини-апп и браузер видят одного и того же пользователя, одну строку в базе. Любая ошибка — аккуратный выход: в попапе компактная страница «Вход не завершён», в обычной вкладке — редирект с человеческим сообщением.", "code": "// CSRF protection: verify state\nconst stateBuf = Buffer.from(state);\nconst savedBuf = Buffer.from(savedState);\nif (stateBuf.length !== savedBuf.length ||\n    !crypto.timingSafeEqual(stateBuf, savedBuf)) {\n  return errorExit(req, res, 'invalid_state');\n}\n\n// Telegram OIDC возвращает ДВА id: sub (внутренний) и id (настоящий).\n// Берём id → Mini App и браузер видят ОДНОГО пользователя:\n//            GrayGendalf\n//                 │\n//        Telegram ID = 123456789\n//           ┌──────┴──────┐\n//         Mini App       Browser\n//           └──────┬──────┘\n//               one user row", "icon": "🔐", "gtitle": "Вход через Telegram"}, {"i": 2, "group": "auth", "name": "Переносит вход на ваш домен", "file": "api/_lib/telegram-exchange.js", "sig": "async function handleExchange(req, res)", "story": "Telegram по правилам владельца возвращает пользователя только на vercel, а сессия браузера обязана жить на duckdns. Эта функция — «грузчик при переезде». Vercel-колбэк передаёт ей одноразовый токен, живущий 60 секунд: данные пользователя + подпись HMAC-SHA256. Здесь подпись проверяется в constant-time, id проверяется на «только цифры», и только затем на duckdns ставится своя cookie tg_session на 30 дней. Дальше — самое приятное: гостевая коллекция (избранное, история, счётчики просмотров) сливается в аккаунт без дублей по filmId, а гостевая строка в базе удаляется. Попап получает команду «закройся», обычная вкладка перезагружается уже вошедшей.", "code": "const body = parts[0];\nconst expect = crypto.createHmac('sha256', secret).update(body).digest('base64url');\nconst got = Buffer.from(parts[1]);\nconst exp = Buffer.from(expect);\nif (got.length !== exp.length || !crypto.timingSafeEqual(got, exp)) {\n  return res.status(401).send('Bad token');     // подделка отклонена\n}\nif (!payload || !payload.id || !payload.exp || payload.exp < nowSec) {\n  return res.status(401).send('Token expired'); // живёт 60 секунд\n}\n\n// Гостевая миграция: коллекция гостя → аккаунт, без дублей\nmergeById(g, { watched_films: mergedWatched }, 'watched_films');\nmergeById(g, { favorite_films: mergedFavs }, 'favorite_films');\ntry { await deleteUser(guestId); } catch (e) {}\n\n// tg_session на БРАУЗЕРНОМ домене, 30 дней\nres.setHeader('Set-Cookie', ['tg_session=' + encodeURIComponent(sessionCookie),\n  'Max-Age=2592000', 'Path=/', 'HttpOnly', 'SameSite=Lax',\n  isProduction ? 'Secure' : ''].filter(Boolean).join('; '));", "icon": "🔐", "gtitle": "Вход через Telegram"}, {"i": 3, "group": "auth", "name": "Мини-окно вместо захвата вкладки", "file": "public/js/app.js", "sig": "openLoginPopup: function()", "story": "Раньше клик «Войти» уносил весь сайт на страницу Telegram — владелец справедливо возмущался. Теперь эта функция открывает маленькое окно 420×760 поверх сайта. Сначала она честно проверяет контекст: в PWA на iPhone и внутри Telegram мини-окно открыло бы Safari и разорвало бы цепочку возврата — там вход идёт в той же вкладке. Если браузер заблокировал попап, функция пробует открыть новую вкладку, и только в самом крайнем случае (на практике почти никогда) — ту же. Пока окно открыто, она присматривает за ним: если вы закрыли окно без ответа, она сама перепроверяет сессию по cookie — и если вход успел состояться, сайт обновляется уже вошедшим.", "code": "var standalone = (window.matchMedia &&\n  window.matchMedia('(display-mode: standalone)').matches) ||\n  window.navigator.standalone === true;\nvar inTg = !!(tg && ((tg.initData && tg.initData.length > 0) ||\n  (tg.platform && tg.platform !== 'unknown')));\n\n// PWA / Mini App: попап разорвал бы цепочку возврата → та же вкладка\nif (standalone || inTg) { window.location.href = url; return; }\n\n// Браузер: мини-окно 420×760 — сайт остаётся открытым\nw = window.open(url, 'filmotiv_tg_login',\n  'width=420,height=760,menubar=no,toolbar=no,...');\n\n// Наблюдатель: окно закрыли без ответа → перепроверяем сессию\nvar iv = setInterval(function() {\n  try { if (!w || w.closed) { clearInterval(iv);\n    App.AUTH.whoamiSync({ force: true }); } }\n  catch (_) { clearInterval(iv); }\n}, 700);", "icon": "🔐", "gtitle": "Вход через Telegram"}, {"i": 4, "group": "auth", "name": "Напоминает сайту, кто вы", "file": "public/js/app.js", "sig": "whoamiSync: async function(opts)", "story": "Главный источник бага «сайт не видит, что я вошёл»: сессия живёт в защищённой HttpOnly-cookie, а сайт определял вход только по localStorage — после OIDC-входа cookie есть, а localStorage пуст. Эта функция спрашивает сервер /api/me: «узнаёшь меня по cookie?» — и синхронизирует localStorage с реальностью. Она срабатывает при загрузке страницы (через 400мс), при возврате на вкладку и при получении фокуса окном — с троттлингом 20 секунд, чтобы не засыпать сервер. Услышав «да, это ты», она рисует тост «Вы вошли как …», прячет кнопку входа и включает премиум-бейдж. Именно поэтому после входа на iPhone сайт наконец «видит» пользователя.", "code": "var res = await App.CORE.apiPost('/api/me', {\n  userId: uid, initData: App.CORE.getTgInitData()\n});\nif (data && data.exists && data.user_id &&\n    String(data.user_id).indexOf('web_') !== 0) {\n  localStorage.setItem('filmotiv_tg_user_id', String(data.user_id));\n  if (data.username) localStorage.setItem('filmotiv_tg_username', String(data.username));\n\n  if (!prevId) {  // состояние сменилось «гость → вошёл» — обновляем UI сразу\n    App.AUTH.checkTgLoginBar();\n    App.UI.showToast('✅ Вы вошли как ' + (data.username || 'Telegram') +\n      ' — коллекция синхронизирована', 4500);\n  }\n}", "icon": "🔐", "gtitle": "Вход через Telegram"}, {"i": 5, "group": "auth", "name": "Кому какую кнопку показывать", "file": "public/js/app.js", "sig": "checkTgLoginBar: function()", "story": "У сайта два разных элемента Telegram, и правила у них разные. Динамическая кнопка внизу («Войти через Telegram» / «Открыть Telegram») — только для гостей: у авторизованных она убирается, как и просил владелец. Футерная кнопка «Доступно в Telegram» — неизменный атрибут подвала: она НЕ должна исчезать у вошедших (урок v210: раньше из-за путаницы «вошёл = внутри Telegram» ей ошибочно ставился невидимый класс in-tg, и она пропадала). Внутри самого Telegram обе не нужны — пользователь уже там. Гостям функция прописывает кнопке адрес входа с гостевым id — коллекция, собранная до входа, переедет в аккаунт автоматически.", "code": "if (isInTelegram) {          // пользователь уже в Telegram\n  fixedBtn.classList.add('hidden');\n} else if (isTVDevice) {     // на ТВ входа нет вовсе\n  fixedBtn.classList.add('hidden');\n} else if (isLoggedIn) {\n  // v208 (владелец): у вошедших динамической кнопки нет —\n  // в футере остаётся бейдж «Доступно в Telegram»\n  fixedBtn.classList.add('hidden');\n  fixedBtn.onclick = null;\n} else {                     // гость — кнопка входа с guest_id\n  fixedText.textContent = 'Войти через Telegram';\n  fixedBtn.href = '/api/auth/telegram/login' +\n    (guestId.indexOf('web_') === 0 ? '?guest_id=' + encodeURIComponent(guestId) : '');\n}", "icon": "🔐", "gtitle": "Вход через Telegram"}, {"i": 6, "group": "auth", "name": "Страховка мини-аппа", "file": "public/js/app.js", "sig": "function markTgSeen()", "story": "Скрипт telegram-web-app.js иногда загружается позже страницы — и признаки Telegram появляются, когда сайт уже нарисовался в «браузерном» виде. Эта функция ловит событие загрузки скрипта и опросом проверяет: не объявились ли признаки Telegram (initData, платформа)? Если да — переинициализирует WebApp, помечает body классом in-tg (правильные отступы, скрытые дубли кнопок), обновляет состояние входа. Это страховочная сетка: ничего не должно зависеть от того, какой скрипт выиграл гонку загрузки.", "code": "if (st === 'tg') {\n  tgHandledTg = true;\n  tg = App.AUTH.initTelegramWebApp();\n  App.AUTH.checkTgLoginBar();\n  App.AUTH.checkAuth();\n  hidePwaBtnInTelegram();\n  // CSS safety net: помечаем Mini App режим (inline-скрипт в index.html\n  // делает то же раньше — это покрывает позднюю загрузку скрипта)\n  try { document.body.classList.add('in-tg'); } catch (_) {}\n}", "icon": "🔐", "gtitle": "Вход через Telegram"}, {"i": 7, "group": "ads", "name": "Плеер-невидимка на границе", "file": "api/embed-edge.js", "sig": "export default async function handler(request)", "story": "Источник плеера (embess) забанил IP серверов Vercel ответом 410 и режет троттлингом IP пользователей — отсюда жалобы «плеер не загружается». Но IP пограничных узлов Edge (CDN-точки рядом с вами) бан не касается. Эта edge-функция ходит к источнику именно с них: до трёх попыток с паузой 800мс, полная маскировка под браузер (Referer, Sec-Fetch заголовки). Получив HTML плеера, она первым элементом в <head> внедряет bridge.js и <base> — и отдаёт вам плеер, который уверен, что живёт у источника. Это главный видеоканал Filmotiv: 7 из 7 проверок проходят стабильно.", "code": "let upstream = null;\nfor (let attempt = 1; attempt <= 3; attempt++) {\n  upstream = await fetch(`${EMBESS_BASE}/embed/kp/${id}`, {\n    signal: AbortSignal.timeout(10000),\n    headers: {\n      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; ...)',\n      'Referer': 'https://filmotiv.vercel.app/',\n      'Sec-Fetch-Dest': 'iframe', 'Sec-Fetch-Mode': 'navigate',\n      'Sec-Fetch-Site': 'cross-site'\n    }\n  });\n  if (upstream.ok) break;\n  if (attempt < 3) await new Promise(r => setTimeout(r, 800));\n}\n\n// Внедряем bridge ПЕРВЫМ элементом <head> + <base> для относительных URL\nconst bridgeTag = '<script src=\"' + bridgeUrl + '\"><\\/script>';\nconst baseTag = '<base href=\"https://api.embess.ws/\">';\nhtml = html.replace(/<head[^>]*>/i, function (match) {\n  return match + bridgeTag + baseTag;\n});", "icon": "🎬", "gtitle": "Фильм без рекламы"}, {"i": 8, "group": "ads", "name": "Чиним сломанные часы плеера", "file": "api/embed-edge.js", "sig": "fragDashFixed / fragHlsFixed (замена парсеров)", "story": "Когда видео идёт через прокси, адреса кадров выглядят как /api/media/https%3A%2F%2F… — а встроенные парсеры venoplayer (fragDash/fragHls) ждут «сырые» пути CDN. Регулярка возвращает null, телеметрия падает с «Cannot read properties of null», конвейер кадров умирает прямо перед показом — и вы смотрите вечный спиннер при нулевом буфере. Эти серверные функции подменяют парсеры: сначала разворачивают прокси-обёртку обратно в чистый URL, потом разбирают его как обычно. Не узнали форму адреса — возвращают безопасный {level:0, sn:0} вместо краха. Видео оживает.", "code": "const fragDashFixed =\n  'fragDash: function(r) { ' +\n  'var __u = String(r && r.url || \\'\\'), __pm = __u.match(/\\\\/api\\\\/media\\\\/(.+)$/); ' +\n  'if (__pm) { try { r = Object.assign({}, r, ' +\n    '{ url: decodeURIComponent(__pm[1]) }); } catch (e) {} } ' +\n  'var m = null; ' +\n  'try { m = new URL(String(r && r.url || \\'\\')).pathname' +\n    '.match(/\\\\/(\\\\d+)\\\\.\\\\d+(?:-\\\\dch)?(?:-(\\\\d+))?\\\\/(\\\\d+)\\\\.webm$/); } catch (e) {} ' +\n  'if (!m) return { type: r && r.mediaType, level: 0, sn: 0 }; ' +  // без краха\n  'return { type: r && r.mediaType, level: +l, sn: +m[3] }; }';\n\nhtml = html.replace(\n  /fragDash:\\s*function\\s*\\(\\s*r\\s*\\)\\s*\\{[\\s\\S]*?sn:\\s*\\+m\\[3\\]\\s*\\};?\\s*\\},/,\n  function () { return fragDashFixed + ','; });", "icon": "🎬", "gtitle": "Фильм без рекламы"}, {"i": 9, "group": "ads", "name": "Пустая корзина для рекламы", "file": "public/bridge.js", "sig": "Object.defineProperty(window, 'adsConfig', …)", "story": "Внутренний плеер источника читает window.adsConfig и решает, играть ли рекламные роллы. Для премиума bridge подменяет это свойство ловушкой: кто бы ни попытался записать туда рекламную раскладку — попадает в «пустую корзину» (сеттер молча выбрасывает запись), а читающий всегда получает конфиг с нулём роллов pre/middle/post и крошечными таймаутами. Плеер входит в «рекламный режим», мгновенно его проходит — и даже не думает блокировать fullscreen. У обычных пользователей корзина не трогается: реклама играет как в оригинале.", "code": "var EMPTY_ADS_CONFIG = {\n  nonLinear: { fallbackOnly: true, url: '', total: 0, offset: 0 },\n  pre:  { vast: { timeouts: { loading: 1, starting: 1, global: 1 } },\n          maxImpressions: 0, urls: [] },\n  middle: { offset: 999999, pop: false, maxImpressions: 0, urls: [] },\n  post: { vast: { timeouts: { loading: 1, starting: 1, global: 1 } },\n          maxImpressions: 0, urls: [] }\n};\ntry {\n  Object.defineProperty(window, 'adsConfig', {\n    get: function() { return EMPTY_ADS_CONFIG; },   // всегда пустота\n    set: function(val) { log('adsConfig assignment blocked'); }, // выброс\n    configurable: true\n  });\n} catch(e) { log('adsConfig override failed', e); }", "icon": "🎬", "gtitle": "Фильм без рекламы"}, {"i": 10, "group": "ads", "name": "Чёрный список 60+ рекламных сетей", "file": "public/bridge.js", "sig": "function isBlocked(url) → trackingPattern.test(url)", "story": "В bridge зашит регулярный список рекламных и трекинговых доменов: doubleclick, googlesyndication, adsterra, propellerads, popads, hilltopads, an.yandex.ru, mc.yandex.ru, ad.mail.ru, taboola, criteo, mgid, exoclick, trafficstars и ещё десятки. Функция isBlocked прогоняет через него каждый URL, который пытается улететь через fetch или XHR. Премиуму вместо запроса возвращается пустой ответ 204 — пакет даже не покидает браузер. Важно, чего список НЕ трогает: видео-CDN (interkh), P2P-трекер, сам API источника и CDN скриптов — ничего лишнего не режется, кино грузится как по маслу.", "code": "var trackingPattern = new RegExp(\n  's\\\\.myangular\\\\.life|stats\\\\.myangular\\\\.life|evr\\\\.mzona\\\\.net' +\n  '|distribrey\\\\.com|getsdk\\\\.online|stiven-king\\\\.com|getaim\\\\.org' +\n  '|doubleclick\\\\.net|googlesyndication\\\\.com|google-analytics\\\\.com' +\n  '|adsterra|propellerads|popads|popcash|popunder|onclickads\\\\.net|clickadu' +\n  '|hilltopads|adcash|adnxs|adroll|taboola|outbrain|criteo|mgid\\\\.com' +\n  '|an\\\\.yandex\\\\.ru|mc\\\\.yandex\\\\.ru|adfox\\\\.ru|adriver\\\\.ru' +\n  '|exoclick|juicyads|revcontent|zeropark|trafficstars|coinzilla' +\n  '|ads\\\\.vk\\\\.com', 'i');\n\nfunction isBlocked(url) {\n  if (typeof url !== 'string') return false;\n  return trackingPattern.test(url);\n}\n\n// Премиум: запрос к рекламе даже не уходит из браузера\nif (PREMIUM && isBlocked(url)) {\n  return Promise.resolve(new Response('', { status: 204 }));\n}", "icon": "🎬", "gtitle": "Фильм без рекламы"}, {"i": 11, "group": "ads", "name": "Пустая обёртка вместо ролика", "file": "public/bridge.js", "sig": "isVastBody(ct, text) + EMPTY_VAST", "story": "Реклама в плеере приезжает XML-документом формата VAST. Функция isVastBody распознаёт такой документ по content-type (vast+xml) или по тегу <VAST> в теле — и вместо него отдаётся EMPTY_VAST: валидный, но абсолютно пустой рекламный документ. Плеер получает «рекламу без рекламы», по своим штатным правилам ловит AdError и молча пропускает ролл. Никаких затыков, чёрных экранов и сломанных контролов — обман согласован с логикой самого плеера.", "code": "// Пустой VAST — отдаётся вместо рекламных XML: плеер получает AdError\n// и молча пропускает ролл (это штатная ветка venoplayer)\nvar EMPTY_VAST = '<?xml version=\"1.0\" encoding=\"utf-8\"?>' +\n                 '<VAST version=\"2.0\"></VAST>';\n\nfunction isVastBody(ct, text) {\n  if (ct && /vast[+]xml/i.test(ct)) return true;\n  if (typeof text === 'string' && text.length < 262144 &&\n      text.indexOf('<VAST') !== -1 && text.indexOf('<MPD') === -1) return true;\n  return false;\n}", "icon": "🎬", "gtitle": "Фильм без рекламы"}, {"i": 12, "group": "ads", "name": "Выключаем пиратский Wi-Fi (P2P)", "file": "public/bridge.js", "sig": "Object.defineProperty(window, 'RTCPeerConnection', …)", "story": "Плеер источника умеет качать кадры у соседних браузеров через P2P (WebRTC). Проблема: его сигнальный WebSocket гео-блокируется в РФ — запрос висит до 300 секунд без фолбэка, видео стоит на нулевом буфере, зритель смотрит спиннер. Bridge прячет RTCPeerConnection (и Mozilla/WebKit-варианты): P2P-движок спрашивает «поддерживается ли WebRTC?» — получает «нет» и честно отходит на обычную загрузку через XHR → наш медиа-прокси. Решение детерминированное и не зависит от региона: все кадры гарантированно идут через надёжный канал.", "code": "// P2P-движок venoplayer: WebSocket недоступен в РФ → 300с висим без фолбэка.\n// Прячем RTCPeerConnection → isSupported === false → движок не включается\n// → ВСЕ сегменты через XHR → наш медиа-прокси.\n['RTCPeerConnection', 'mozRTCPeerConnection', 'webkitRTCPeerConnection']\n  .forEach(function (k) {\n    try {\n      Object.defineProperty(window, k, {\n        get: function () { return undefined; },   // «WebRTC? не знаю такого»\n        set: function () {},\n        configurable: true\n      });\n    } catch (e) {}\n  });", "icon": "🎬", "gtitle": "Фильм без рекламы"}, {"i": 13, "group": "ads", "name": "Запасной плеер по ломаной расписке", "file": "api/embed-edge.js", "sig": "parseFlixFileString(file) → [{q, url}]", "story": "Резервный источник FlixCDN сломан у самих себя: их бэкенд отдаёт строку вида «[360]…360.mp4:hls:manifest.m3u8,[480]…», а их собственный фронт не понимает «:hls:» — 404 на каждый запрос видео. Эта функция делает их работу, но правильно: разбирает строку на качества, отрезает мёртвый хвост «:hls:manifest.m3u8» и возвращает чистый список {качество, url}. Хитрость в том, что CDN-ссылки привязаны к IP того, кто вызвал API — поэтому и список файлов, и сами байты видео гоняются через одну и ту же edge-функцию (IP совпадает — видео играет). Бонус: их скрипты и реклама не загружаются вообще.", "code": "function parseFlixFileString(file) {\n  // \"[360]https://.../360.mp4:hls:manifest.m3u8,[480]...\" → [{q,url}]\n  const out = [];\n  const parts = String(file || '').split(',');\n  for (const raw of parts) {\n    const m = raw.trim().match(/^\\[(\\d+)\\](.+)$/);\n    if (!m) continue;\n    const q = parseInt(m[1], 10) || 0;\n    // отрезаем мёртвый «:hls:»-хвост, который ломает их собственный плеер\n    const u = m[2].trim().replace(/:hls:manifest\\.m3u8$/i, '');\n    if (!/^https?:\\/\\//i.test(u)) continue;\n    out.push({ q, url: u });\n  }\n  return out;\n}", "icon": "🎬", "gtitle": "Фильм без рекламы"}, {"i": 14, "group": "data", "name": "Дирижёр каталога", "file": "api/_lib/kinopoisk.js", "sig": "async function fetchKinopoisk(path, params)", "story": "Все карточки фильмов приходят от неофициального API Кинопоиска — с лимитами на каждый ключ. Функция ведёт оркестр по слоям: сначала быстрая память (L1), затем общий KV-кеш (L2) — и только при промахе в обоих запускает гонку ключей. Исчерпанные ключи (429 «слишком часто», 402 «квота кончилась») отправляются в штрафбут на 5 минут, а раунд-робин равномерно изнашивает все ключи, чтобы ни один не страдал первым. Если первая тройка не смогла — пробуются оставшиеся, затем все ключи с другим User-Agent; для поиска есть запасной эндпоинт v2.2, когда v2.1 заблокирован для ключа. Итог всегда один: каталог открывается.", "code": "// L1: память инстанса (30 минут)\nconst cached = cache.get(cacheKey);\nif (cached && Date.now() - cached.ts < CACHE_TTL) {\n  return makeResult(200, cached.data, 'HIT-MEMORY');\n}\n// L2: общий KV-кеш, подогреваем L1 из L2\nvar distCached = await distCache.get('kp:' + cacheKey);\nif (distCached) {\n  cache.set(cacheKey, { data: distCached, ts: Date.now() });\n  return makeResult(200, distCached, 'HIT-KV');\n}\n\nlet winner = await raceBatch(targetUrl, firstBatch, 0);\nif (!winner) winner = await raceBatch(remainingKeys.slice(0, 3), 0);\n// Фолбэк: поиск v2.1 заблокирован ключу → v2.2 отдаёт ту же форму\nif (!winner && /^v2\\.1\\/films\\/search-by-keyword$/.test(path)) {\n  winner = await raceBatch(fbUrl, API_KEYS.slice(0, 3), 0);\n}", "icon": "🗂️", "gtitle": "Каталог и данные"}, {"i": 15, "group": "data", "name": "Стартуют три — выигрывает один", "file": "api/_lib/kinopoisk.js", "sig": "async function raceBatch(targetUrl, keys, uaIndex)", "story": "Вместо того чтобы спрашивать ключи по очереди (медленно и грустно), функция отправляет запрос сразу трём ключам одновременно. Promise.any возвращает ответ первого успешного — остальные подрезаются AbortController'ом, не дожидаясь финиша. Ключ, поймавший 429/402 прямо в гонке, немедленно помечается исчерпанным и выбывает. Заголовки имитируют настоящий браузер: шесть вариантов User-Agent (Chrome, Safari, Firefox, iPhone, Android), Referer kinopoisk.ru, русская Accept-Language — иначе Cloudflare отдаёт 403 за «ботоподобность». Это техника «гонки», обычно применяемая к зеркалам, — здесь она экономит квоты ключей.", "code": "const controllers = keys.map(() => new AbortController());\nconst promises = keys.map((apiKey, idx) => {\n  const ctrl = controllers[idx];\n  const timeoutId = setTimeout(() => { try { ctrl.abort(); } catch (_) {} },\n    REQUEST_TIMEOUT_MS);                    // 4 секунды на всех\n\n  return fetch(targetUrl, { headers, signal: ctrl.signal })\n    .then(async (upstream) => {\n      if (isExhaustionStatus(upstream.status)) {  // 429 / 402\n        markKeyExhausted(apiKey);                 // в штрафбут на 5 минут\n        throw new Error(`Key ${apiKey.slice(0, 8)} exhausted`);\n      }\n      const data = await upstream.json();\n      return { data, winnerIdx: idx, key: apiKey };\n    });\n});\n\nconst w = await Promise.any(promises);   // первый успешный забирает всё\ncontrollers.forEach(c => { try { c.abort(); } catch (_) {} }); // остальных — под нож", "icon": "🗂️", "gtitle": "Каталог и данные"}, {"i": 16, "group": "data", "name": "Есть ли фильм в плеере?", "file": "api/_lib/embed-check.js", "sig": "async function checkAvailability(ids)", "story": "Каталог Кинопоиска шире, чем библиотека плеера источника: часть фильмов показать просто нечем. Функция батчем (до 60 id за раз) стучится к источнику и по HTTP-статусу делает вывод: 200 — фильм есть, 404 — увы. Результаты складываются в общий кеш на 6 часов, и вопрос «покажется ли этот фильм?» больше не требует хода в сеть. Принцип fail-open: если проверка сама не удалась (сеть, таймаут) — фильм показывается как обычно. Лучше редкая ошибка уже в плеере, чем внезапно исчезнувшие карточки из «Новинок».", "code": "// Признак доступности = HTTP-статус ответа embess:\n//   200 → фильм есть, 404 → фильма нет\nconst ids = String(query.ids || '').split(',').map(s => s.trim())\n  .filter(s => /^\\d+$/.test(s)).slice(0, 60);\n\nconst map = query.debug === '1'\n  ? await checkAvailabilityDebug(ids)   // с статусами для диагностики\n  : await checkAvailability(ids);       // L1 + KV кеш 6ч, fail-open\n\nreturn res.status(200).json({ ok: true, available: map.available || map });", "icon": "🗂️", "gtitle": "Каталог и данные"}, {"i": 17, "group": "data", "name": "Общая тетрадка доступности", "file": "api/_lib/avail-store.js", "sig": "async function mergeAvail(results)", "story": "Каждый зритель, открывший фильм в плеере, подтверждает факт: «этот фильм есть». Плеер пишет подтверждение в общий кеш (POST /api/kinopoisk?q=_embed-cache), а эта функция сливает его в общую «тетрадку» в KV: id → true. Теперь новые посетители получают список доступных фильмов одним запросом (GET до 120 id) — без единого обращения к капризному источнику. Получается взаимопомощь без координации: чей-то вечерний просмотр ускоряет чужую загрузку каталога. Отдельно приятное: тетрадка переживает перезапуски серверов — она живёт в общем KV, а не в памяти инстанса.", "code": "// POST разрешён ТОЛЬКО для записи общего кеша доступности\nif (req.method === 'POST') {\n  if (path !== '_embed-cache') return res.status(405).json({ error: 'Method not allowed' });\n  const results = body && body.results && typeof body.results === 'object'\n    ? body.results : null;\n  if (!results) return res.status(400).json({ error: 'Missing results' });\n  const saved = await availStore.mergeAvail(results);   // id → true\n  return res.status(200).json({ ok: true, saved });\n}\n\n// Чтение: до 120 id одним запросом, без хода в источник\nconst available = await availStore.getAvail(ids);\nreturn res.status(200).json({ ok: true, available });", "icon": "🗂️", "gtitle": "Каталог и данные"}, {"i": 18, "group": "data", "name": "Память в два слоя", "file": "api/_lib/cache.js", "sig": "async function get(key) / set(key, value, ttl)", "story": "Серверные функции Vercel живут недолго и ничего не помнят между запусками — «золотая рыбка» облака. Поэтому память двухслойная: быстрая Map внутри инстанса (до 500 записей, умирает вместе с инстансом) и общий Redis (Vercel KV), где всё лежит с TTL и переживает любые перезапуски. Хитрость экономии: getMany забирает пачку ключей одной MGET-командой вместо N отдельных — на бесплатном тарифе посчитана каждая команда, и пачка экономит квоту в разы. Если KV недоступен — тихий откат в память: сайт продолжает работать, просто чуть быстрее забывает.", "code": "// Batch get: одна pipeline-команда вместо N команд get (экономит квоту KV)\nasync function getMany(keys) {\n  if (HAS_KV) {\n    const body = JSON.stringify([['MGET', ...list]]);   // пачка одним махом\n    const res = await fetch(process.env.KV_REST_API_URL + '/pipeline', {\n      method: 'POST',\n      headers: { 'Authorization': 'Bearer ' + process.env.KV_REST_API_TOKEN },\n      body: body\n    });\n    // → массив значений той же длины: значение | null\n  }\n  // Память-фолбэк: до 500 записей, старые вытесняются\n  memCache.set(key, { value, expiresAt: ttlSeconds ? Date.now() + ttlSeconds * 1000 : null });\n  if (memCache.size > 500) {\n    const oldest = memCache.keys().next().value;\n    memCache.delete(oldest);\n  }\n}", "icon": "🗂️", "gtitle": "Каталог и данные"}, {"i": 19, "group": "data", "name": "Путешествие через чужие двери", "file": "api/_lib/egress.js", "sig": "async function fetchViaProxies(targetUrl, opts)", "story": "Когда источник режет IP дата-центров, остаётся последний путь — бесплатные публичные прокси. Список (~150–300 адресов) берётся из monosans-списка, обновляющегося каждый час, и живёт в памяти 30 минут. Функция строит CONNECT-туннель через выбранный прокси на голых net+tls (нулевые зависимости!), поверх туннеля делает обычный HTTPS-запрос. Удачный прокси запоминается как lastGood и пробуется первым в следующих запросах — серии получаются быстрыми. Три неудачи подряд — честная сдача с ошибкой наверх. Так достаётся HTML плеера для резервного канала, когда прямые зеркала молчат.", "code": "// CONNECT-туннель до targetHost:443 через HTTP-прокси\nsock.once('connect', () => {\n  sock.write('CONNECT ' + targetHost + ':443 HTTP/1.1\\r\\n' +\n             'Host: ' + targetHost + ':443\\r\\n\\r\\n');\n});\nconst tlsSock = tls.connect({ socket: sock, servername: targetHost,\n  rejectUnauthorized: false }, () => done(null, tlsSock));\n\nconst agent = new https.Agent({ keepAlive: false });\nagent.createConnection = () => tlsSock;  // документированное переопределение\n\n// lastGood пробуется первым — экономит время в сериях запросов\nif (lastGood && proxies.indexOf(lastGood) !== -1 &&\n    Date.now() - lastGoodTs < 10 * 60 * 1000) {\n  candidates.push(lastGood);\n}", "icon": "🗂️", "gtitle": "Каталог и данные"}, {"i": 20, "group": "data", "name": "Расшифровка чужого шифра", "file": "api/media/[...url].mjs", "sig": "function decodeXenx(origin, hash)", "story": "Источник прячет видео-адреса за самодельным шифром: /x-en-x/<hash>, где hash — это base64 от «часового ведра + путь», записанный подменённым алфавитом из 52 символов. Их скрипт cdn.js шифрует, эта функция — расшифровывает: обратная подстановка букв → base64-декодирование → чистый путь и запрос. Дальше адрес проверяется по строгому белому списку хостов, и видео качается через serverless-egress (AWS): именно его CDN разрешает, а edge-IP режет ответом 410. Получилась редкая инженерная развилка: два прокси-канала с принципиально разными «выходами в город» — embed идёт через Edge, видео через Serverless.", "code": "// x-en-x: hash = substitute(btoa(hourBucket + '/' + pathname + search))\nconst XENX_L = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';\nconst XENX_E = 'DlchEXitLONYRkFjAsnBbymWzSHMqKPgQZpvwerofJTVdIuUcxaG';\n\nfunction decodeXenx(origin, hash) {\n  try {\n    // обратная подстановка алфавита → обычный base64\n    const rev = hash.split('').map(c => {\n      const i = XENX_E.indexOf(c); return i > -1 ? XENX_L[i] : c;\n    }).join('');\n    const decoded = Buffer.from(rev, 'base64').toString('utf8');\n    const m = decoded.match(/^\\d+\\/(\\/.+)$/);   // отрезаем часовое ведро\n    if (!m) return null;\n    return origin + '/api/media/' + encodeURIComponent(/* восстановленный URL */);\n  } catch (_) { return null; }\n}", "icon": "🗂️", "gtitle": "Каталог и данные"}, {"i": 21, "group": "site", "name": "Дворецкий с узкими полномочиями", "file": "public/sw.js", "sig": "self.addEventListener('fetch', …)", "story": "Service Worker — посредник между сайтом и сетью. Этот сознательно скромен: навигации (HTML-страницы) НЕ перехватываются вообще — вы всегда получаете свежую версию сайта с сервера, никаких «прошлых версий» из кеша. Кешируются только статические ассеты (JS/CSS/шрифты/иконки) под именем filmotiv-v209. Новый деплой меняет имя кеша, а при активации старые кеши удаляются — обновление доходит всем, но без лишних сбросов. Результат: сайт открывается мгновенно даже на слабой сети и работает офлайн для уже загруженных частей.", "code": "// HTML идёт напрямую из сети — SW не перехватывает navigation-запросы\nif (req.mode === 'navigate' || req.destination === 'document') return;\n\nconst CACHE_NAME = 'filmotiv-v209';\nconst STATIC_ASSETS = [\n  'css/app.css', 'css/cyber.css',\n  'js/app.js', 'js/cyber.js', 'bridge.js',\n  'fonts/oswald-cyrillic.woff2', 'icon-192.png', 'offline.html'\n];\n\nself.addEventListener('activate', function(event) {\n  // старые кеши (прежних версий) — под нож\n  names.filter(function(name) { return name !== CACHE_NAME; })\n       .forEach(function(name) { caches.delete(name); });\n});", "icon": "⚡", "gtitle": "Сайт и скорость"}, {"i": 22, "group": "site", "name": "Прелоадер, живущий в полке", "file": "public/js/app.js", "sig": "showGridLoader() / gridLoaderGate()", "story": "Владелец просил прелоадеры при переключении категорий и поиске — но не на весь экран, а внутри блока карточек. showGridLoader рисует в сетке фирменный лоадер: орбы, эмблему F, ротацию надписей «Загружаем каталог… → Готовим постеры… → Почти готово…» и прогресс-бар. gridLoaderGate держит его минимум 900мс — причём таймер идёт ПАРАЛЛЕЛЬНО с fetch: при мгновенной отдаче из кеша лоадер всё равно виден, а сетевая задержка не суммируется с минимумом. Пустой вспышки между «минимумом» и данными нет: лоадер убирает та же функция, что рисует карточки.", "code": "GRID_LOADER_MIN: 900,\n\n// gate идёт ПАРАЛЛЕЛЬНО с fetch: минимум показа без задержки данных\ngridLoaderGate: async function() {\n  var wait = this.GRID_LOADER_MIN - (Date.now() - this._gridLoaderAt);\n  if (wait > 0) await new Promise(function(r) { setTimeout(r, wait); });\n  try { App.UI.hideGridLoader(); } catch (_) {}\n},\n\nshowGridLoader: function() {\n  // фирменный лоадер ВНУТРИ #filmGrid: орбы, эмблема, надписи, прогресс\n  grid.innerHTML = '<div class=\"grid-preloader\">…Загружаем каталог…</div>';\n}", "icon": "⚡", "gtitle": "Сайт и скорость"}, {"i": 23, "group": "site", "name": "Включаем свет → Почти готово…", "file": "public/index.html", "sig": "#preloader + postersDone()", "story": "Первое, что видит посетитель, — полноэкранный лоадер с плёночными перфорациями и ротацией фраз: «Включаем свет…», «Загружаем каталог…», «Готовим постеры…», «Почти готово…». Финиш привязан к реальной готовности первого экрана: DOM + фон героя + постеры первой полосы карточек (ленивые постеры ниже фолда не задерживают). Фразы не зацикливаются — последняя держится до фактической загрузки. История бага: раньше экран снимался по window.load, а то событие ждало ВСЕ постеры страницы — 7–9 секунд ожидания. После привязки к первому экрану загрузка занимает около 1.3 секунды.", "code": "// финиш = DOM готов + постеры ПЕРВОГО ЭКРАНА загружены\n// (lazy-постеры ниже фолда не блокируют; failsafe 8с на всякий случай)\nvar contentReady = Promise.race([\n  Promise.all([domReady, heroReady, eagerPostersReady]),\n  new Promise(function(r) { setTimeout(r, 8000); })   // failsafe\n]);\ncontentReady.then(function() {\n  document.getElementById('preloader').classList.add('pl-done');\n});", "icon": "⚡", "gtitle": "Сайт и скорость"}, {"i": 24, "group": "site", "name": "Курьер видео по кирпичикам", "file": "api/media/[...url].mjs", "sig": "export default async function handler(request)", "story": "Видео DASH/HLS приходит кусочками по 2–4 секунды, и каждый кусочек CDN отдаёт не всякому IP: российские и edge-адреса получают 410, а AWS-serverless — 200. Прокси живёт именно на serverless-рантайме. Он принимает /api/media/<адрес>, при необходимости расшифровывает x-en-x, пересылает Range-заголовки (перемотка работает!), и пропускает статусы 206/410/403 наверх — плеер сам решает, как реагировать на беду. Манифесты (.mpd/.m3u8) переписываются на лету: относительные пути сегментов становятся абсолютными прокси-URL — иначе плеер уйдёт за кадрами мимо курьера и застрянет.", "code": "// Строгий белый список хостов — только видео-CDN источника\nconst ALLOWED_HOST = /^(?:[a-z0-9-]+\\.)*(?:interkh\\.com|embess\\.ws|stiven-king\\.com)$/i;\nif (!ALLOWED_HOST.test(u.hostname)) return new Response('Host not allowed', { status: 403 });\n\n// Range-заголовок пробрасывается: перемотка и байт-диапазоны работают\nconst range = request.headers.get('range');\nif (range) reqHeaders['Range'] = range;\n\n// Манифесты переписываются: сегменты → абсолютные прокси-URL\ntext = text.replace(/https?:\\/\\/[a-z0-9-]+\\.interkh\\.com\\/[^\\s\"'<>\\\\]+/gi,\n  function (m) { return toProxyUrl(m); });", "icon": "⚡", "gtitle": "Сайт и скорость"}, {"i": 25, "group": "site", "name": "Автопилот доменов", "file": "public/js/domain-migrate.js", "sig": "(function migrate() …)", "story": "У Filmotiv два адреса, и у каждого своя роль — правило владельца: «ссылки на vercel — только для приложения Telegram, для браузера — duckdns». Этот скрипт определяет контекст: если открыто внутри Telegram (объект WebApp, хэш #tgWebAppData, характерный User-Agent) — никуда не переезжаем, мини-апп живёт на vercel. Обычный браузер, зашедший на vercel, — плавный переезд на duckdns. Так каждый пользователь всегда на правильном домене, а сессии и куки не разъезжаются по чужим адресам.", "code": "// Мини-апп на vercel больше не переезжает на duckdns\nfunction inTelegram() {\n  var t = window.Telegram && window.Telegram.WebApp;\n  if (t && (t.initData || (t.platform && t.platform !== 'unknown'))) return true;\n  if (location.hash.indexOf('#tgWebAppData') === 0) return true;  // хэш TG\n  if (navigator.userAgent.indexOf('Telegram') !== -1) return true;\n  return false;\n}\nif (!inTelegram()) {\n  // браузер с vercel → плавный переезд на duckdns\n  window.location.replace('https://filmotiv.duckdns.org' + path);\n}", "icon": "⚡", "gtitle": "Сайт и скорость"}, {"i": 26, "group": "site", "name": "Личное дело зрителя", "file": "api/me.js", "sig": "module.exports = async (req, res)", "story": "Один запрос /api/me рассказывает сайту всё о вас: существует ли аккаунт, премиум ли он, что в избранном, что просмотрено, какой фильм был последним. Сервер узнаёт пользователя по HttpOnly-cookie tg_session: подпись HMAC-SHA256 проверяется на сервере — из браузера такую cookie невозможно подделать, даже открыв консоль. Для гостей существует «web_-версия» той же записи — коллекция работает и до входа, а при входе просто переезжает в аккаунт (миграцию делает exchange). Премиум сверяется с отдельным реестром — статус не потеряется при переподключении базы.", "code": "// Сессия: base64(id:timestamp) + '.' + HMAC-SHA256(secret, payload)\nconst sessionCookie = Buffer.from(sessionPayload).toString('base64') +\n  '.' + crypto.createHmac('sha256', secret).update(sessionPayload).digest('hex');\n\n// Ответ одним пакетом: профиль + коллекции + премиум\nres.status(200).json({\n  exists: true,\n  user_id: user.telegram_id,\n  username: user.username,\n  is_premium: !!user.is_premium,\n  favorites: user.favorite_films || [],\n  watched_films: user.watched_films || []\n});", "icon": "⚡", "gtitle": "Сайт и скорость"}, {"i": 27, "group": "site", "name": "Бот-консьерж @Filmotivbot", "file": "api/bot/webhook.js", "sig": "module.exports = async (req, res)", "story": "Бот — вторая дверь в Filmotiv. Команда /start рисует меню с большой web_app-кнопкой «Открыть приложение» — она ведёт на vercel, как и положено мини-аппу. Кнопка поиска принимает название фильма и возвращает карточки прямо в чат, кнопка входа запускает тот же официальный OAuth, что и сайт. Все ответы бота берут данные через общий клиент Кинопоиска (гонка ключей + двухслойный кеш) напрямую, без лишнего HTTP-хопа к собственному API — экономно и для лимитов функций, и для холодных стартов. Кнопка меню чата программно назначена «Start💥» — жмёшь, и ты в приложении.", "code": "// Все TG-поверхности → TG_APP_URL (vercel): правило владельца\nawait bot('setChatMenuButton', { menu_button: {\n  type: 'web_app', text: 'Start💥',\n  web_app: { url: process.env.TG_APP_URL }        // https://filmotiv.vercel.app\n}});\n\n// Поиск прямо в чате: общий клиент Кинопоиска напрямую, без HTTP-хопа\nconst { fetchKinopoisk } = require('../_lib/kinopoisk');\nconst result = await fetchKinopoisk('v2.1/films/search-by-keyword',\n  { keyword: query, page: 1 });\n\n// web_app-кнопки «Открыть приложение» / «▶ Смотреть» → vercel", "icon": "⚡", "gtitle": "Сайт и скорость"}];
+const TL = [{"v": "v84", "t": "Первый релиз", "d": "24 августа 2026. Онлайн-кинотеатр сразу в двух обличьях — сайт-PWA и Mini App внутри Telegram: каталог Кинопоиска, плеер, бот с «Моими фильмами», «Подборкой», поиском и Premium за Telegram Stars, база Supabase, офлайн-кеш и автопост «Фильма дня». Безопасность заложена с первого дня: подпись входа проверяется ключом бота, сессия живёт в защищённой cookie."}, {"v": "v97", "t": "Мелочи, которые чувствуешь", "d": "7 сентября. Кнопка «наверх» срабатывает с первого тапа (pointerdown вместо клика с задержкой 300мс), бот научился правильно называть устройство — «Telegram / iPhone», а не безликий «Браузер», и перестал плодить дубли сообщений в чате."}, {"v": "v157", "t": "Скорость и надёжность", "d": "10 сентября. Убран 20-секундный спиннер в обычном браузере — скрипт Telegram стал грузиться только после открытия страницы. Один общий клиент Кинопоиска: гонка API-ключей, двухуровневый кеш, таймауты на все внешние запросы и мониторинг доступности каждые 15 минут с алертом админу. Карточки фильмов потеряли лишний текст, платежи Stars защищены от двойного зачисления."}, {"v": "v158", "t": "Чистая память", "d": "10 сентября. Обновление сайта стало сносить ВСЕ старые кеши — уходят «скриншоты из памяти» и хвосты прошлых стилей. Очистка чата бота теперь удаляет и сами сообщения, а в уведомлении о новом пользователе видна платформа: «Mini App — Telegram / Desktop»."}, {"v": "v160", "t": "Рождение Filmotiv", "d": "Проект перерос рабочее имя «Генопоиск»: собственный бренд, бот @Filmotivbot и фирменная неоновая тема с орбами и свечением — в ней оформлена и эта инфографика."}, {"v": "v171", "t": "Фирменный стиль", "d": "10 сентября. Единый логотип во всех точках контакта: play-треугольник с неоновым градиентом в палитре сайта — иконки приложения (включая маскируемые для Android), favicon в браузере и иконка для iPhone."}, {"v": "бот", "t": "«Фильм дня» на автопилоте", "d": "Бот сам публикует фильм дня в Telegram-канал. Приватные каналы подключаются без юзернейма: при первом посте бот запоминает числовой ID канала и присылает подтверждение «Канал подключён»."}, {"v": "v181", "t": "Плеер против троттлинга", "d": "Источник отвечал ошибкой 422 на «горячий» IP — плеер показывал пустой экран. Теперь до 7 попыток с нарастающими паузами, честный экран «Фильма нет» с кнопками, загрузки через TorAPI и зеркало без 405-х."}, {"v": "v184", "t": "Сервер за плеером", "d": "HTML плеера достаётся сервером: зеркала источника троттлят IP пользователей"}, {"v": "v186", "t": "Два канала видео", "d": "Edge-прокси для плеера (embess банит AWS) + Serverless-прокси для кадров (CDN банит Edge)"}, {"v": "v187", "t": "Запасной плеер", "d": "FlixCDN поднят на своём плеере поверх их сломанного API — и без их рекламы"}, {"v": "v205", "t": "Официальный вход", "d": "Telegram OAuth: страница подтверждения вместо бота, без ввода номера"}, {"v": "v206", "t": "Скорость 1.3с", "d": "Прелоадер больше не ждёт все постеры страницы (было 7–9с)"}, {"v": "v207", "t": "OIDC + PKCE", "d": "Login Widget зарегистрирован в BotFather; прелоадер ждёт реальный первый экран"}, {"v": "v208", "t": "Сессия по-честному", "d": "Сессия браузера всегда на duckdns; попап-вход; whoami-синхронизация"}, {"v": "v209", "t": "Прелоадер в полке", "d": "Фирменный прелоадер внутри блока карточек (≥900мс); вход — только новое окно"}, {"v": "v210", "t": "Кнопки на местах", "d": "«Доступно в Telegram» больше не пропадает после входа (регрессия v209 исправлена)"}];
+const JOURNEY = [{"n": "1", "ic": "🎬", "t": "Клик «Смотреть»", "d": "Открывается player.html и просит сервер найти источник фильма"}, {"n": "2", "ic": "🛰️", "t": "Плеер достаётся", "d": "embed-edge идёт к источнику с Edge-IP: 3 попытки, маскировка, bridge внедрён"}, {"n": "3", "ic": "🚫", "t": "Реклама вырезается", "d": "bridge ставит пустую корзину adsConfig и ловит 60+ рекламных доменов (премиум)"}, {"n": "4", "ic": "📦", "t": "Кадры качаются", "d": "media-прокси расшифровывает x-en-x и тащит сегменты через разрешённый egress"}, {"n": "5", "ic": "▶️", "t": "Кино играет", "d": "Парсеры fragDash/fragHls починены, P2P-двигатель выключен — без вечного спиннера"}, {"n": "6", "ic": "📓", "t": "Факт фиксируется", "d": "«Фильм есть» пишется в общую тетрадку — каталог ускоряется для всех"}];
+const QUICK = [{"ic": "🎞️", "t": "Что это", "d": "Онлайн-кинотеатр: каталог Кинопоиска + рабочий плеер. Без VPN, без установки."}, {"ic": "🔍", "t": "Как пользоваться", "d": "Нашёл фильм → нажал «Смотреть» → идёт кино. Регистрация не нужна."}, {"ic": "🔐", "t": "Вход по желанию", "d": "Один тап через Telegram — и коллекция переезжает с вами: браузер, телефон, бот."}, {"ic": "🚫", "t": "Без рекламы", "d": "Рекламные сети режутся до загрузки: пустые роллы, 60+ доменов в чёрном списке."}, {"ic": "⚡", "t": "Скорость", "d": "Первый экран ~1.3с; картинки, стили и скрипты живут в двухслойном кеше."}];
+const CMP = [{"k": "Доставка плеера", "a": "Источник забанил серверы — «плеер недоступен»", "b": "3 канала: Edge, Serverless, публичные прокси"}, {"k": "Реклама", "a": "Роллы и попандеры играют", "b": "Вырезается до загрузки: пустой adsConfig, 60+ доменов, пустой VAST"}, {"k": "Вход", "a": "Форма, пароль, восстановление", "b": "Telegram за один тап, без пароля; гостю — то же самое, но молча"}, {"k": "Коллекция", "a": "Привязана к одному браузеру", "b": "Браузер + мини-апп + бот: одна запись пользователя, авто-миграция гостя"}, {"k": "Скорость", "a": "Полная загрузка до первого кадра", "b": "Первый экран ~1.3с, лоадеры только там, где ждёшь данные"}, {"k": "Домены", "a": "Один домен или каша редиректов", "b": "Строгое правило: vercel — мини-апп, duckdns — браузер"}];
+const HOMES = [{"d": "filmotiv.vercel.app", "t": "Дом приложения Telegram", "c": "#38bdf8", "items": ["Menu Button «Start💥» и web_app-кнопки бота ведут сюда", "Telegram OAuth зарегистрирован на этот домен (redirect + trusted origin)", "Вход из мини-аппа живёт здесь: initData вместо cookie"]}, {"d": "filmotiv.duckdns.org", "t": "Дом браузера и PWA", "c": "#ec4899", "items": ["Доступен из РФ без VPN — здесь смотрят в браузере", "Сессия браузера tg_session ставится именно сюда (exchange после OIDC)", "Гостевая коллекция мигрирует в аккаунт на этом домене"]}];
+const STATS = {"lines": 21486, "routes": 13, "ads": 61, "funcs": 28, "versions": 127};
+
+/* ---------- счётчики ---------- */
+const STATS_DEF = [
+  {num: STATS.lines, lbl: 'строк кода'},
+  {num: STATS.funcs, lbl: 'ключевых функций разобрано'},
+  {num: STATS.ads, lbl: 'рекламных доменов в блок-листе'},
+  {num: STATS.routes, lbl: 'serverless-функций API'},
+  {num: STATS.versions, lbl: 'публичных версий (v84→v210)'},
+];
+const statsEl = document.getElementById('stats');
+statsEl.innerHTML = STATS_DEF.map((s,i)=>`<div class="stat reveal" style="transition-delay:${i*60}ms"><div class="num" data-target="${s.num}">0</div><div class="lbl">${s.lbl}</div></div>`).join('');
+
+function animateCounters(){
+  document.querySelectorAll('.num[data-target]').forEach(el=>{
+    if (el.__done) return; el.__done = true;
+    const target = +el.dataset.target, dur = 1400, t0 = performance.now();
+    const step = t => {
+      const p = Math.min(1,(t-t0)/dur), eased = 1-Math.pow(1-p,3);
+      el.textContent = Math.round(target*eased).toLocaleString('ru-RU');
+      if (p<1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  });
+}
+
+/* reveal-механика объявлена РАНЬШЕ первого использования (render вызывает observeReveals) */
+var io = null;
+function observeReveals(){
+  if (!io) io = new IntersectionObserver(entries=>{
+    entries.forEach(en=>{
+      if (en.isIntersecting){
+        en.target.classList.add('vis');
+        if (en.target.closest('#stats')) animateCounters();
+        io.unobserve(en.target);
+      }
+    });
+  }, {threshold:.12});
+  document.querySelectorAll('.reveal:not(.vis)').forEach(el=>io.observe(el));
+}
+
+/* ---------- секции ---------- */
+document.getElementById('quickGrid').innerHTML = QUICK.map(q=>`
+  <div class="qcard reveal"><div class="qic">${q.ic}</div><h3>${q.t}</h3><p>${q.d}</p></div>`).join('');
+
+document.getElementById('journeyGrid').innerHTML = JOURNEY.map(j=>`
+  <div class="jstep reveal"><span class="jn">${j.n}</span><div class="jic">${j.ic}</div><h4>${j.t}</h4><p>${j.d}</p><span class="jarrow"></span></div>`).join('');
+
+document.getElementById('homesGrid').innerHTML = HOMES.map(h=>`
+  <div class="home reveal" style="--hc:${h.c}"><h3>${h.d}</h3><div class="hrole">${h.t}</div><ul>${h.items.map(i=>`<li>${i}</li>`).join('')}</ul></div>`).join('');
+
+document.getElementById('cmpGrid').innerHTML =
+  `<div class="cmp-row head"><div></div><div>Обычный плеер-прокси</div><div>Filmotiv</div></div>` +
+  CMP.map(c=>`<div class="cmp-row"><div class="ck">${c.k}</div><div class="cbad">${c.a}</div><div class="cgood">${c.b}</div></div>`).join('');
+
+document.getElementById('tlGrid').innerHTML = TL.map(t=>`
+  <div class="tl-item reveal"><span class="tv">${t.v}</span><div class="tt">${t.t}</div><div class="td">${t.d}</div></div>`).join('');
+
+/* ---------- каталог функций ---------- */
+const grid = document.getElementById('fgrid');
+const chipsEl = document.getElementById('chips');
+const qEl = document.getElementById('q');
+const fcount = document.getElementById('fcount');
+let activeGroup = 'all', query = '';
+
+const escapeHtml = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+function highlight(code){
+  return escapeHtml(code)
+    .replace(/(\/\/[^\n]*)/g,'<span class="cm">$1</span>')
+    .replace(/('[^'\n]*')/g,'<span class="st">$1</span>')
+    .replace(/\b(const|let|var|function|return|if|else|for|await|async|new|try|catch|class|export|import|from)\b/g,'<span class="kw">$1</span>');
+}
+
+function card(f){
+  return `<article class="fcard reveal" data-group="${f.group}" data-i="${f.i}" id="f${f.i}">
+    <div class="fhead" onclick="toggleCard(${f.i})">
+      <div class="frow"><span class="fbadge">${f.icon} ${f.gtitle}</span><span class="fnum">#${String(f.i+1).padStart(2,'0')}</span></div>
+      <div class="fname">${f.name}</div>
+      <div class="ffile">${f.file}</div>
+    </div>
+    <div class="fbody"><div class="finner">
+      <div class="fsig">${escapeHtml(f.sig)}</div>
+      <p class="fstory">${f.story}</p>
+      <div class="fcode" data-code="${escapeHtml(f.code)}" oncontextmenu="igCtx(event,${f.i})">
+        <div class="cbhead"><span class="dots"><i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i></span>настоящий фрагмент · ПКМ — копировать</div>
+        <pre>${highlight(f.code)}</pre>
+      </div>
+      <p class="fhint">ПКМ по коду → <b>Копировать код</b> / <b>Копировать имя</b> / <b>Копировать описание</b></p>
+    </div></div>
+  </article>`;
+}
+
+function render(){
+  const ql = query.trim().toLowerCase();
+  const list = FUNCS.filter(f=>{
+    if (activeGroup!=='all' && f.group!==activeGroup) return false;
+    if (!ql) return true;
+    return (f.name+' '+f.file+' '+f.sig+' '+f.story).toLowerCase().indexOf(ql)!==-1;
+  });
+  grid.innerHTML = list.map(card).join('');
+  fcount.textContent = list.length + ' из ' + FUNCS.length;
+  observeReveals();
+}
+
+window.toggleCard = function(i){
+  const el = document.getElementById('f'+i);
+  if (el) el.classList.toggle('open');
+};
+
+GMETA.forEach(g=>{
+  const b = document.createElement('button');
+  b.className = 'chip'; b.textContent = g.icon+' '+g.title; b.dataset.g = g.id;
+  b.onclick = ()=>{ activeGroup = (activeGroup===g.id?'all':g.id);
+    chipsEl.querySelectorAll('.chip').forEach(c=>c.classList.toggle('on', c.dataset.g===activeGroup));
+    render(); };
+  chipsEl.appendChild(b);
+});
+const all = document.createElement('button');
+all.className='chip on'; all.textContent='✳️ Все'; all.dataset.g='all';
+all.onclick=()=>{ activeGroup='all'; chipsEl.querySelectorAll('.chip').forEach(c=>c.classList.toggle('on', c.dataset.g==='all')); render(); };
+chipsEl.prepend(all);
+qEl.addEventListener('input', ()=>{ query = qEl.value; render(); });
+render();
+
+/* ---------- ПКМ: копирование ---------- */
+const ctx = document.getElementById('ctx');
+let ctxTarget = null;
+window.igCtx = function(e, i){
+  e.preventDefault(); e.stopPropagation();
+  ctxTarget = FUNCS[i];
+  ctx.innerHTML = `
+    <button onclick="doCopy('code')">📋 Копировать код</button>
+    <button onclick="doCopy('name')">🏷️ Копировать имя функции</button>
+    <button onclick="doCopy('story')">📖 Копировать описание</button>`;
+  ctx.classList.add('show');
+  const w = 240, h = 150;
+  ctx.style.left = Math.min(e.clientX, innerWidth - w - 10) + 'px';
+  ctx.style.top = Math.min(e.clientY, innerHeight - h - 10) + 'px';
+};
+window.doCopy = async function(what){
+  if (!ctxTarget) return;
+  const text = what==='code' ? ctxTarget.code : what==='name' ? ctxTarget.name : ctxTarget.story;
+  let ok = false;
+  try { await navigator.clipboard.writeText(text); ok = true; } catch(_){
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text; ta.style.cssText='position:fixed;opacity:0';
+      document.body.appendChild(ta); ta.select();
+      ok = document.execCommand('copy'); ta.remove();
+    } catch(__){}
+  }
+  toast(ok ? 'Скопировано: ' + (what==='code'?'код':what==='name'?'имя':'описание') + ' ✓' : 'Не удалось скопировать');
+  ctx.classList.remove('show');
+};
+document.addEventListener('click', e=>{ if (!ctx.contains(e.target)) ctx.classList.remove('show'); });
+document.addEventListener('keydown', e=>{ if (e.key==='Escape') ctx.classList.remove('show'); });
+
+let toastTimer = null;
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>t.classList.remove('show'), 2200);
+}
+
+observeReveals();
+</script>
+</body>
+</html>
