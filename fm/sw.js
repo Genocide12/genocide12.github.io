@@ -7,7 +7,7 @@
 // Only caches static assets (JS/CSS/images) for offline.
 // HTML pages go directly to network — no SW interference.
 
-const CACHE_NAME = 'filmotiv-v209';
+const CACHE_NAME = 'filmotiv-v210';
 const STATIC_ASSETS = [
   'css/app.css',
   'css/cyber.css',
@@ -28,8 +28,7 @@ const STATIC_ASSETS = [
   'favicon.ico',
   'offline.html',
   'fonts/oswald-cyrillic.woff2',
-  'fonts/oswald-latin.woff2',
-  'img/animated-text-fill.png'
+  'fonts/oswald-latin.woff2'
 ];
 
 self.addEventListener('install', function(event) {
