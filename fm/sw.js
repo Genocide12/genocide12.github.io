@@ -1,11 +1,12 @@
-// Filmotiv Service Worker v206 (v206: вход одной вкладкой + мгновенный прелоадер + /help без админ-поста + документы на telegra.ph; v205: вход через официальный Telegram OAuth — страница подтверждения вместо бота; v204: прелоадер 1.2с + единый лоадер контента и плеера,
+// Filmotiv Service Worker v207 (v207: вход через зарегистрированный Login Widget (OIDC, vercel), прелоадер ждёт карточки первого экрана, кнопка поиска вправо на мобайле, мгновенный прелоадер при закрытии плеера;
+// v206: вход одной вкладкой + мгновенный прелоадер + /help без админ-поста + документы на telegra.ph; v205: вход через официальный Telegram OAuth — страница подтверждения вместо бота; v204: прелоадер 1.2с + единый лоадер контента и плеера,
 // мобильный поиск-иконка; v203: фикс избранного для гостей; v202: прелоадер стартовой страницы в index.html;
 // v192: относительные пути — работает и под /fm/ на зеркале; резервный плеер удалён)
 // SIMPLIFIED — does NOT intercept navigation requests.
 // Only caches static assets (JS/CSS/images) for offline.
 // HTML pages go directly to network — no SW interference.
 
-const CACHE_NAME = 'filmotiv-v206';
+const CACHE_NAME = 'filmotiv-v207';
 const STATIC_ASSETS = [
   'css/app.css',
   'css/cyber.css',

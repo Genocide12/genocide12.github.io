@@ -1305,6 +1305,10 @@ body.light-theme .adhd-toast { background: rgba(8, 12, 30, .96); border-color: r
 /* v204: мобильный поиск — в свёрнутом виде остаётся только значок 🔍,
    тап по нему разворачивает строку (запрос владельца: мобильные + Telegram-приложение) */
 @media (max-width: 760px) {
+  /* v207 (владелец): кнопку поиска отодвинуть ВПРАВО — пилюля 🔍 прижата
+     к правому краю шапки (мобайл + мини-апп Telegram), а не стоит вплотную
+     к логотипу. В развёрнутом виде строка по-прежнему на всю ширину. */
+  .pm-search { display: flex; justify-content: flex-end; }
   .pm-search .search-container { width: 44px; min-width: 44px; padding: 2px 6px 2px 12px; border-radius: 22px; cursor: pointer; }
   .pm-search .search-input { width: 0; padding-left: 0; padding-right: 0; opacity: 0; transition: opacity .2s ease; }
   .pm-search .gp-kbd { display: none; }

@@ -100,7 +100,7 @@
     })();
   </script>
   <link rel="stylesheet" href="css/app.css?v=206">
-  <link rel="stylesheet" href="css/cyber.css?v=204">
+  <link rel="stylesheet" href="css/cyber.css?v=205">
   <!-- Structured Data for Search Engines (JSON-LD) -->
   <script type="application/ld+json">
   {
@@ -184,16 +184,28 @@
         if (status) status.textContent = phrases[pi];
       }, 700);
       function setP(v) { p = Math.max(p, v); if (fill) fill.style.width = p + '%'; }
-      // v206 (владелец: «сначала загрузились постеры, потом закрывался прелоадер»):
-      // ждём постеры ПЕРВОГО ЭКРАНА сетки (loading=eager) — нижние (lazy) грузятся
-      // при скролле и ожидания не требуют. Пока каталог не отрисован — ждём его.
+      // v207 (владелец: «в прелоадере только «Включаем свет…», а карточки
+      // загрузились только через секунду после загрузки сайта»): экран держится,
+      // пока первый экран реально не готов. Сигналы готовности:
+      //  — filmotiv:hero-ready — фон героя «Смотрят онлайн» загрузился (cyber.js);
+      //  — filmotiv:grid-cards — карточки или пустоесостояние сетки в DOM (app.js).
+      // Раньше здесь был shortcut «window.load → снять экран»: карточки приходят
+      // из API ПОСЛЕ load, поэтому экран уходил до появления карточек. Оба
+      // события также срабатывают при полном промахе (сети/фильмов нет) —
+      // зависания нет, плюс остаётся failsafe 8с ниже.
+      var contentReady = false;
+      function onContentReady() {
+        if (contentReady) return;
+        contentReady = true;
+        setP(92);
+        maybeFinish();
+      }
+      document.addEventListener('filmotiv:hero-ready', onContentReady);
+      document.addEventListener('filmotiv:grid-cards', onContentReady);
       function postersDone() {
+        if (!contentReady) return false; // ждём карточки/герой первого экрана
+        // После сигнала — дождаться eager-постеров сетки, если они есть
         var eager = document.querySelectorAll('#filmGrid img.film-poster[loading="eager"]');
-        if (eager.length === 0) {
-          if (loadEvt) return true; // страница целиком загрузилась — ждать нечего
-          var grid = document.getElementById('filmGrid');
-          return !!(grid && grid.querySelectorAll('img.film-poster').length > 0);
-        }
         for (var i = 0; i < eager.length; i++) { if (!eager[i].complete) return false; }
         return true;
       }
@@ -583,8 +595,8 @@
   <!-- ADHD OS micro-interactions (confetti, toasts, haptics) -->
   <script defer src="js/adhd-os.js?v=191"></script>
   <!-- All JS bundled into one file (core + device + auth + ui + movies + tracking + app) -->
-  <script defer src="js/app.js?v=205"></script>
+  <script defer src="js/app.js?v=206"></script>
   <!-- Neon dashboard: сайдбар, герой, секции, жанры, рейл, режим поиска -->
-  <script defer src="js/cyber.js?v=204"></script>
+  <script defer src="js/cyber.js?v=205"></script>
 </body>
 </html>

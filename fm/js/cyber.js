@@ -204,6 +204,17 @@
   var heroIdx = 0;
   var heroTimer = null;
   var heroReadySent = false; // v204: событие filmotiv:hero-ready шлётся один раз
+  // v207 (владелец: «карточки загрузились через секунду после открытия сайта»):
+  // событие «первый экран готов» — активный фон героя загрузился (или окончательно
+  // не смог), либо героя не будет вовсе. Прелоадер стартовой держит экран до этого
+  // сигнала. Раньше событие НЕ срабатывало на первом слайде: у него сразу стоит
+  // src, а хук в heroLoadBg реагировал только на data-src — экран уходил до
+  // появления карточек (оставался только ранний shortcut по window.load).
+  function heroReadyOnce() {
+    if (heroReadySent) return;
+    heroReadySent = true;
+    try { document.dispatchEvent(new CustomEvent('filmotiv:hero-ready')); } catch (_) {}
+  }
 
   function heroBuild(films) {
     var hero = $('cyberHero');
@@ -213,7 +224,7 @@
     // Фоны грузим ЛЕНИВО: только активный слайд и соседние (heroLoadBg),
     // иначе 15 больших постеров ломили бы сеть на мобильных.
     heroFilms = films.filter(function(f) { return posterOf(f); }).slice(0, 15);
-    if (heroFilms.length === 0) return;
+    if (heroFilms.length === 0) { heroReadyOnce(); return; } // v207: ждать нечего
     // Надпись «Смотрят онлайн» — ВНУТРИ блока cyber-hero (запрос пользователя),
     // с пульсирующим live-индикатором: фильмы — топ-100 Кинопоиска.
     var html = '<div class="cyber-hero-head"><span class="cyber-hero-live" aria-hidden="true"></span>Смотрят онлайн</div>';
@@ -262,6 +273,14 @@
     heroShow(0);
     heroBind();
     heroTimer = setInterval(function() { heroShow((heroIdx + 1) % heroFilms.length); }, 7000);
+    // v207: сигнал «первый экран готов» — по активному фону первого слайда
+    var firstImg = hero.querySelector('.cyber-hero-slide.active .cyber-hero-bg');
+    if (!firstImg) { heroReadyOnce(); }
+    else if (firstImg.complete) { setTimeout(heroReadyOnce, 0); }
+    else {
+      firstImg.addEventListener('load', heroReadyOnce, { once: true });
+      firstImg.addEventListener('error', heroReadyOnce, { once: true });
+    }
   }
 
   // Ленивая подгрузка фонов hero: активный слайд + соседние (i-1, i+1)
@@ -277,17 +296,9 @@
       if (img && img.getAttribute('data-src') && !img.getAttribute('src')) {
         // v204 (владелец): прелоадер стартовой ждёт и постеры — сигнал
         // «первый экран готов» уходит, когда активный фон героя загрузился
-        // (или окончательно не смог). Прелоадер ограничивает ожидание 4с
-        // после window.load, так что битый постер не блокирует показ.
-        if (k === i && !heroReadySent) {
-          heroReadySent = true;
-          var heroReady = function () {
-            try { document.dispatchEvent(new CustomEvent('filmotiv:hero-ready')); } catch (_) {}
-          };
-          img.addEventListener('load', heroReady, { once: true });
-          img.addEventListener('error', heroReady, { once: true });
-          if (img.complete) setTimeout(heroReady, 0);
-        }
+        // (или окончательно не смог). v207: хук вынесен в heroReadyOnce()
+        // (для первого слайда сигнал ставится в heroBuild — у него сразу src).
+        if (k === i) heroReadyOnce();
         img.setAttribute('src', img.getAttribute('data-src'));
         img.removeAttribute('data-src');
       }
@@ -599,7 +610,11 @@
     // Секции «Смотрят онлайн» (ряд) и «★ Новинки 2026» удалены по запросу:
     // популярные теперь показаны самим cyber-hero (с надписью внутри блока),
     // новинки остались категорией в сайдбаре/чипах.
-    setTimeout(ensureTop, 1500);
+    // v207 (владелец: «карточки фильмов загрузились только через секунду»):
+    // ряд «Топ рейтинга» раньше стартовал через 1.5с — успевал появиться уже
+    // ПОСЛЕ снятия прелоадера. 400мс — герой успевает начать грузиться первым,
+    // а ряд рендерится вместе с открытием сайта (кеш читается так же мгновенно).
+    setTimeout(ensureTop, 400);
 
     var secs = $('cyberSections');
     if (secs) secs.hidden = false;
@@ -852,6 +867,7 @@
         fetchCat('popular').then(function(data) {
           var films = (data && (data.films || data.items)) || [];
           if (films.length > 0) heroFill(films);
+          else heroReadyOnce(); // v207: сети/фильмов нет — прелоадеру нечего ждать
         });
       };
       heroTry();

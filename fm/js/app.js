@@ -574,6 +574,8 @@
       if (filmGrid) {
         var ic = icon || '🎬';
         filmGrid.innerHTML = '<div class="empty-state"><div class="empty-icon">' + ic + '</div><div class="empty-text">' + (msg || 'По вашему запросу фильмов не найдено 🤔 Попробуйте найти что-нибудь другое!') + '</div></div>';
+        // v207: легитимно пустая сетка — сигнал прелоадеру, что ждать нечего
+        try { document.dispatchEvent(new CustomEvent('filmotiv:grid-cards')); } catch (_) {}
       }
       App.UI.hideLoader();
     },
@@ -723,6 +725,11 @@
         frag.appendChild(card);
       });
       filmGrid.appendChild(frag);
+      // v207 (владелец: «карточки загрузились через секунду после открытия
+      // сайта»): сигнал прелоадеру — карточки в DOM, осталось дождаться
+      // видимых (eager) постеров. Событие идемпотентно — прелоадер снимается
+      // по первому срабатыванию, повторные показы сетки на него не влияют.
+      try { document.dispatchEvent(new CustomEvent('filmotiv:grid-cards')); } catch (_) {}
       App.UI.hideLoader();
       // Single film or forceCenter → centered layout.
       // Multi-film → ensure grid (remove centered/random-mode from prev state).
