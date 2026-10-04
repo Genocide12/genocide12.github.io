@@ -973,6 +973,29 @@
       }
       if (data.type === 'pip_enter') console.log('[player] PiP active');
       if (data.type === 'pip_error') console.warn('PiP error:', data.message);
+      if (data.type === 'stall_nudge') {
+        // watchdog в бридже сам вылечил замирание (авто-отмотка -5с)
+        console.warn('[player] Stall watchdog: авто-отмотка -5с с позиции', data.at, '(#' + data.nudge + ')');
+      }
+      if (data.type === 'stall_critical') {
+        // отмотки не помогли — перезагружаем плеер с восстановлением позиции
+        console.warn('[player] Stall watchdog: замирание не вылечено отмоткой (frozen', Math.round((data.frozenMs || 0) / 1000) + 'с, segErrors:', data.segErrors + ') → перезагрузка');
+        var nowTs = Date.now();
+        if (__stallReload.count >= 2 || nowTs - __stallReload.last < 150000) {
+          console.warn('[player] Stall watchdog: лимит перезагрузок исчерпан (', __stallReload.count, '/2) — остаёмся на месте');
+        } else {
+          __stallReload.count++;
+          __stallReload.last = nowTs;
+          // зафиксировать позицию немедленно — resume вернётся ровно в место замирания
+          if (lastKnownTime >= 5) {
+            lastSaveTime = 0;
+            lastBackendSaveTime = 0;
+            maybeSavePosition(lastKnownTime);
+          }
+          seekRetries = 0;
+          loadPlayer(__bridgePremium);
+        }
+      }
     });
 
     function saveBeforeLeave() {
@@ -1015,6 +1038,7 @@
     var __bridgePremium = false; // какой бридж сейчас в iframe
     var __bridgeArrived = false; // bridge_ready получен (srcdoc ИЛИ edge-iframe)
     var __metaArrived = false;   // метаданные видео получены (длительность > 0)
+    var __stallReload = { count: 0, last: 0 }; // перезагрузки по stall_critical (макс 2, кулдаун 150с)
     // v192: __srcMode и резервный плеер удалены по запросу владельца («старый
     // заработал нормально») — осталась цепочка edge → семейство зеркал.
     (function() {
@@ -1101,7 +1125,7 @@
       // v192: путь к бриджу — с корнем текущей страницы ('' на vercel-корне,
       // '/fm' на зеркале) — относительность внутри srcdoc не работает из-за <base>.
       var __rootDir = (location.pathname.replace(/\/[^\/]*$/, '')) || '';
-      var bridgeTag = '<script src="https://' + window.location.host + __rootDir + '/bridge.js?v=187' + (__bridgePremium ? '&premium=1' : '') + '"><\/script>';
+      var bridgeTag = '<script src="https://' + window.location.host + __rootDir + '/bridge.js?v=210' + (__bridgePremium ? '&premium=1' : '') + '"><\/script>';
       var baseTag = '<base href="' + (baseHref || 'https://api.embess.ws/') + '">';
       var referrerMeta = '<meta name="referrer" content="no-referrer">';
       if (/<head[^>]*>/i.test(html)) {

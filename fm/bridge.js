@@ -17,9 +17,19 @@
 //   3) Парсеры fragDash/fragHls фиксятся на сервере embed-edge
 //      (proxy-aware, см. api/embed-edge.js).
 // ПРЕМИУМ-РЕЖИМ: блокировка рекламы — привилегия премиума.
-//   /bridge.js?v=186&premium=1 → плеер БЕЗ рекламы
-//   /bridge.js?v=186           → реклама работает как в оригинале
+//   /bridge.js?v=210&premium=1 → плеер БЕЗ рекламы
+//   /bridge.js?v=210           → реклама работает как в оригинале
 // Функциональные фиксы (высота #player, resume, медиа-прокси, P2P) — для всех.
+//
+// v210 — STALL WATCHDOG: авто-лечение замираний потока. Симптом (отчёт
+// владельца): раз в ~30 минут видео замирает при «играющем» плеере, помогает
+// только отмотка назад на ~5с (2-4 раза за фильм). Причина: CDN подписывает
+// URL сегментов токенами с коротким TTL; по истечении каждый новый сегмент
+// получает 410/403 (прокси пробрасывает статус), буфер высыхает. Отмотка
+// заставляет venoplayer пере-запросить манифест — CDN выдаёт свежие токены.
+// Watchdog делает это автоматически: 12с замороженного currentTime при
+// ошибках сегментов (30с без них — медленная сеть) → nudge -5с; не помогло
+// после двух nudge → stall_critical в player.html (перезагрузка с позицией).
 
 (function() {
   if (window.__filmotivBridge) return;
@@ -37,6 +47,11 @@
   log('Bridge loaded (premium=' + PREMIUM + ')');
 
   var videoEl = null;
+
+  // Счётчик ошибок сегментов (4xx/5xx проксированных interkh-запросов).
+  // Присваивается в setupVideo (замыкание на watchdog), зовётся из
+  // fetch/XHR-обёрток ниже — сигнал «токены CDN истекли» для watchdog.
+  var segErrorSink = null;
 
   function post(msg) {
     try { parent.postMessage(msg, '*'); } catch(_) {}
@@ -301,6 +316,7 @@
           input = new Request(proxied, input);
         }
         return origFetch.call(this, input, init).then(function(res) {
+          if (res && res.status >= 400 && segErrorSink) segErrorSink();
           return wrapManifestResponse(res, proxied);
         });
       }
@@ -366,6 +382,10 @@
           log('XHR → media proxy:', url.slice(0, 70));
           arguments[1] = proxied;
           this._filmotivUrl = proxied;
+          var segErrXhr = this;
+          segErrXhr.addEventListener('load', function() {
+            if (segErrXhr.status >= 400 && segErrorSink) segErrorSink();
+          });
           return origOpen.apply(this, arguments);
         }
       }
@@ -616,6 +636,81 @@
     video.addEventListener('leavepictureinpicture', function() {
       post({ type: 'pip_leave' });
     });
+
+    // ====== 3b. Stall watchdog (v210) — авто-лечение замираний ======
+    // CDN подписывает URL сегментов токенами с коротким TTL (~30 мин).
+    // По истечении токена новые сегменты получают 410/403, буфер высыхает,
+    // currentTime замирает при «играющем» видео. Отмотка назад на ~5с
+    // заставляет venoplayer пере-запросить манифест → CDN выдаёт свежие
+    // токены (проверено владельцем вручную). Watchdog автоматизирует это:
+    //  - счётчик ошибок сегментов (segErrorSink ← fetch/XHR-обёртки);
+    //  - замороженный currentTime ≥12с при ошибках (≥30с без них —
+    //    медленная сеть) → nudge: currentTime -= 5;
+    //  - не помогло после двух nudge (≥45с непрерывного замирания) →
+    //    stall_critical в player.html — перезагрузка плеера с позицией.
+    // НЕ считается сталлом: пауза, скраб (seeking), конец фильма (последние
+    // 2с), фоновая вкладка (document.hidden), отсутствие метаданных.
+    // wdProgressTime — якорь последнего «живого» currentTime. null до первого
+    // тика: видео может быть аттачнуто ДО старта воспроизведения (currentTime=0),
+    // и прыжок 0→текущий нельзя считать прогрессом (иначе первый тик стирает
+    // уже накопленные ошибки сегментов)
+    var wdProgressTime = null;
+    var wdProgressAt = Date.now();
+    var wdNudges = 0;
+    var wdLastCriticalAt = 0;
+    var wdSegErrors = 0;
+    segErrorSink = function() { wdSegErrors++; };
+
+    video.addEventListener('seeking', function() {
+      // скраб пользователя или наш nudge — «часы замирания» заново
+      wdProgressAt = Date.now();
+    });
+    video.addEventListener('playing', function() {
+      wdProgressAt = Date.now();
+    });
+
+    var wdTimer = setInterval(function() {
+      try {
+        var now = Date.now();
+        var t = video.currentTime || 0;
+        var d = video.duration || 0;
+        if (video.paused || video.ended || video.seeking || document.hidden ||
+            !(d > 0) || t >= d - 2) {
+          wdProgressTime = t; wdProgressAt = now; return;
+        }
+        if (wdProgressTime === null) { wdProgressTime = t; wdProgressAt = now; return; }
+        if (Math.abs(t - wdProgressTime) > 0.05) {
+          // есть прогресс — эпизод замирания закрыт
+          wdProgressTime = t; wdProgressAt = now;
+          wdNudges = 0; wdSegErrors = 0;
+          return;
+        }
+        var frozenSec = Math.round((now - wdProgressAt) / 1000);
+        // эпизод: максимум 2 авто-отмотки — дальше только сигнал игроку,
+        // иначе каждый nudge сбрасывает «часы замирания» и до critical
+        // очередь никогда не доходит
+        if (wdNudges >= 2 && frozenSec >= 45 && now - wdLastCriticalAt > 60000) {
+          wdLastCriticalAt = now;
+          log('Stall watchdog: frozen', frozenSec + 's, nudges:', wdNudges, '→ stall_critical');
+          post({ type: 'stall_critical', at: t, frozenMs: now - wdProgressAt, segErrors: wdSegErrors });
+          return;
+        }
+        var enough = (wdSegErrors > 0) ? frozenSec >= 12 : frozenSec >= 30;
+        if (enough && wdNudges < 2) {
+          wdNudges++;
+          log('Stall watchdog: frozen', frozenSec + 's, segErrors:', wdSegErrors, '→ nudge -5s (#' + wdNudges + ')');
+          post({ type: 'stall_nudge', at: t, nudge: wdNudges });
+          try {
+            var target = Math.max(0, t - 5);
+            video.currentTime = target;
+            // цель — новая точка отсчёта: если воспроизведение не
+            // возобновилось, следующий тик НЕ примет наш же nudge за прогресс
+            wdProgressTime = target;
+          } catch (e) { log('Stall nudge failed', e); }
+          wdProgressAt = Date.now();
+        }
+      } catch (e) {}
+    }, 3000);
 
     window.addEventListener('message', function(e) {
       if (!e.data) return;
