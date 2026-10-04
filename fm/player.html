@@ -1125,7 +1125,7 @@
       // v192: путь к бриджу — с корнем текущей страницы ('' на vercel-корне,
       // '/fm' на зеркале) — относительность внутри srcdoc не работает из-за <base>.
       var __rootDir = (location.pathname.replace(/\/[^\/]*$/, '')) || '';
-      var bridgeTag = '<script src="https://' + window.location.host + __rootDir + '/bridge.js?v=210' + (__bridgePremium ? '&premium=1' : '') + '"><\/script>';
+      var bridgeTag = '<script src="https://' + window.location.host + __rootDir + '/bridge.js?v=211' + (__bridgePremium ? '&premium=1' : '') + '"><\/script>';
       var baseTag = '<base href="' + (baseHref || 'https://api.embess.ws/') + '">';
       var referrerMeta = '<meta name="referrer" content="no-referrer">';
       if (/<head[^>]*>/i.test(html)) {

@@ -17,8 +17,8 @@
 //   3) Парсеры fragDash/fragHls фиксятся на сервере embed-edge
 //      (proxy-aware, см. api/embed-edge.js).
 // ПРЕМИУМ-РЕЖИМ: блокировка рекламы — привилегия премиума.
-//   /bridge.js?v=210&premium=1 → плеер БЕЗ рекламы
-//   /bridge.js?v=210           → реклама работает как в оригинале
+//   /bridge.js?v=211&premium=1 → плеер БЕЗ рекламы
+//   /bridge.js?v=211           → реклама работает как в оригинале
 // Функциональные фиксы (высота #player, resume, медиа-прокси, P2P) — для всех.
 //
 // v210 — STALL WATCHDOG: авто-лечение замираний потока. Симптом (отчёт
@@ -30,6 +30,21 @@
 // Watchdog делает это автоматически: 12с замороженного currentTime при
 // ошибках сегментов (30с без них — медленная сеть) → nudge -5с; не помогло
 // после двух nudge → stall_critical в player.html (перезагрузка с позицией).
+//
+// v211 — НЕЗАМЕТНОЕ ЛЕЧЕНИЕ (отзыв владельца на v210: «нельзя сделать так,
+// чтобы было незаметно для пользователей?»). Живой замер прод-зондом
+// (scripts/probe_token_rotation.js, 2026-10-04) скорректировал диагноз v210:
+// токены сегментов живут не 30 минут (t= ~10 дней) и не привязаны к сессии
+// (сегмент с «чужим» свежим токеном → 206). Главный корень — ЗАВИСШИЕ
+// СОЕДИНЕНИЯ (лечение — в api/media v211: таймаут старта + повторка + разрыв
+// апстрима при уходе клиента). Второй слой здесь, в бридже:
+//   • TOKEN ROTATION (секция 0c-bis): манифесты ставятся на учёт, свежие
+//     query токенов собираются из их тел, протухший query сегмента тихо
+//     подменяется свежим ДО отправки запроса — 410/403 не доходят до плеера;
+//   • segErrorSink теперь запускает реактивную ротацию — повторные запросы
+//     (ретраи dash.js, nudge) уходят с живым токеном.
+// Watchdog v210 (nudge -5с → stall_critical) остаётся последним рубежом —
+// при живых слоях v211 до него очередь не доходит.
 
 (function() {
   if (window.__filmotivBridge) return;
@@ -85,8 +100,13 @@
   }
 
   function upstreamFromProxy(u) {
-    if (typeof u !== 'string' || u.indexOf(MEDIA_PROXY) !== 0) return null;
-    try { return decodeURIComponent(u.slice(MEDIA_PROXY.length)); } catch (e) { return null; }
+    // v211: раньше строго anchoring на MEDIA_PROXY (origin+mark) — относительные
+    // /api/media/... не распознавались и guard в wrapManifestResponse пропускал
+    // уже-проксированные манифесты на перезапись. Теперь якоримся на метку.
+    if (typeof u !== 'string') return null;
+    var i = u.indexOf(PROXY_MARK);
+    if (i === -1) return null;
+    try { return decodeURIComponent(u.slice(i + PROXY_MARK.length)); } catch (e) { return null; }
   }
 
   function resolveUp(u, base) {
@@ -144,6 +164,126 @@
     if (text.indexOf('#EXTM3U') !== -1) return rewriteM3u8Body(text, up);
     return text;
   }
+
+  // ====== 0c-bis. TOKEN ROTATION (v211, для ВСЕХ) — незаметная профилактика ======
+  // Второй слой лечения замираний (первый — серверный, retry в api/media).
+  // Замер прод-зондом (scripts/probe_token_rotation.js, 2026-10-04): токены
+  // сегмента в query (t=&rt=&fckz2=&…) у КАЖДОЙ выдачи манифеста свои
+  // (0/6 совпадений), токен НЕ привязан к сессии (сегмент с «чужим» свежим
+  // токеном → 206). Значит при отказе сегмента вида 410/403 свежий query
+  // можно подставить ТИХО, на сетевом уровне, до отправки запроса — плеер
+  // ничего не замечает: ни отмоток, ни перезагрузок, ни буферинга.
+  // Механика: bridge помнит URL манифестов (fetch/XHR-обёртки), периодически
+  // (14 мин) и по первому манифесту (+0.5с) перекачивает их через прокси,
+  // собирает path→свежий query (включая шаблоны $Number$/$Time$), и при
+  // запросе сегмента с протухшим query подменяет его свежим.
+  var WD_MANIFEST_CAP = 6;
+  var WD_ROTATE_MS = 14 * 60 * 1000;   // профилактическая ротация
+  var WD_ROTATE_GAP_MS = 15000;        // анти-дребезг между ротациями
+  var WD_FRESH_PATH_CAP = 6000;        // защита памяти на длинных плейлистах
+  var wdManifestUrls = [];
+  var wdFreshExact = {};
+  var wdFreshExactCount = 0;
+  var wdFreshPatterns = [];
+  var wdLastRotate = 0;
+
+  function wdIsManifestUrl(u) {
+    return typeof u === 'string' && /\.mpd(?:[?#]|$)|\.m3u8(?:[?#]|$)/i.test(u);
+  }
+
+  function wdNoteManifestUrl(proxiedUrl) {
+    // v211: принимаем и абсолютные, и относительные проксированные URL —
+    // ротация качает их в том же виде, в каком увидел запрос
+    if (typeof proxiedUrl !== 'string' || proxiedUrl.indexOf(PROXY_MARK) === -1) return;
+    if (wdManifestUrls.indexOf(proxiedUrl) !== -1) return;
+    if (wdManifestUrls.length >= WD_MANIFEST_CAP) return;
+    wdManifestUrls.push(proxiedUrl);
+    log('Manifest captured for token rotation (' + wdManifestUrls.length + ')');
+    if (wdManifestUrls.length === 1) {
+      // первый сбор — сразу: карта свежих токенов готова ДО первой подмены
+      setTimeout(function () { wdRotateTokens('first'); }, 500);
+    }
+  }
+
+  function wdHarvest(text) {
+    var n = 0, m;
+    var re = /\/api\/media\/([^"'\s<>\\]+)/g;
+    while ((m = re.exec(text)) !== null) {
+      var up = null;
+      try { up = decodeURIComponent(m[1]); } catch (_) { continue; }
+      if (!up || !INTERKH_URL_RE.test(up)) continue;
+      var qi = up.indexOf('?');
+      if (qi === -1) continue;
+      var path = up.slice(0, qi);
+      var q = up.slice(qi + 1);
+      if (!q) continue;
+      if (path.indexOf('$') !== -1) {
+        // шаблон dash.js ($Number$/$Time$/$RepresentationID$) → паттерн:
+        // каждый заполнитель матчит любой один сегмент пути
+        var src = path.replace(/\$[^$]*\$/g, '#');
+        var known = false;
+        for (var i = 0; i < wdFreshPatterns.length; i++) {
+          if (wdFreshPatterns[i].src === src) { wdFreshPatterns[i].q = q; known = true; break; }
+        }
+        if (!known && wdFreshPatterns.length < 64) {
+          try {
+            // скейп спецсимволов пути (точки!), заполнители # → [^/]+
+            var esc = src.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            wdFreshPatterns.push({ src: src, re: new RegExp('^' + esc.split('#').join('[^/]+') + '$'), q: q });
+            n++;
+          } catch (_) {}
+        }
+      } else if (wdFreshExact[path] !== q) {
+        if (wdFreshExact[path] === undefined) {
+          if (wdFreshExactCount >= WD_FRESH_PATH_CAP) continue;
+          wdFreshExactCount++;
+        }
+        wdFreshExact[path] = q;
+        n++;
+      }
+    }
+    return n;
+  }
+
+  function wdRotateTokens(reason) {
+    var now = Date.now();
+    if (now - wdLastRotate < WD_ROTATE_GAP_MS) return;
+    wdLastRotate = now;
+    var doFetch = (typeof origFetch === 'function') ? origFetch : window.fetch;
+    for (var i = 0; i < wdManifestUrls.length; i++) {
+      (function (murl) {
+        try {
+          doFetch(murl, { cache: 'no-store' }).then(function (r) {
+            return r.ok ? r.text() : null;
+          }).then(function (t) {
+            if (!t) return;
+            var n = wdHarvest(t);
+            if (n) log('Token rotation (' + reason + '): +' + n + ' fresh URLs');
+          }).catch(function () {});
+        } catch (_) {}
+      })(wdManifestUrls[i]);
+    }
+  }
+  setInterval(function () { wdRotateTokens('timer'); }, WD_ROTATE_MS);
+
+  // Подмена протухшего query свежим (exact-путь или шаблон).
+  // Возврат: НОВЫЙ upstream-URL или null (менять нечего/нечем).
+  function wdFreshenUpstream(up) {
+    if (typeof up !== 'string') return null;
+    var qi = up.indexOf('?');
+    if (qi === -1) return null;
+    var path = up.slice(0, qi);
+    var q = up.slice(qi + 1);
+    var fresh = wdFreshExact[path];
+    if (fresh === undefined && wdFreshPatterns.length) {
+      for (var i = 0; i < wdFreshPatterns.length; i++) {
+        if (wdFreshPatterns[i].re.test(path)) { fresh = wdFreshPatterns[i].q; break; }
+      }
+    }
+    if (fresh === undefined || fresh === q) return null;
+    return path + '?' + fresh;
+  }
+  // ====== конец TOKEN ROTATION ======
 
   // ====== 0a. Pre-emptively neutralize adsConfig — ТОЛЬКО ПРЕМИУМ ======
   // venoplayer reads window.adsConfig to decide if ads should play.
@@ -307,13 +447,47 @@
       // NOTE: запрос переиздаётся с НОВЫМ input — старый код переназначал
       // `input`, но звал оригинал с протухшим `arguments`, и рерайт
       // молча не применялся.
+      // v211: подмена протухшего токена и учёт ошибок работают в ОБЕИХ
+      // формах — и для сырого interkh-URL, и для УЖЕ ПРОКСИРОВАННОГО
+      // (главный путь dash.js: сегменты из переписанного сервером манифеста;
+      // в v210 их 4xx не считались вовсе).
       var proxied = toProxyUrl(url);
       if (proxied) {
-        log('fetch → media proxy:', url.slice(0, 70));
-        if (typeof input === 'string') {
-          input = proxied;
-        } else if (input && input.url) {
-          input = new Request(proxied, input);
+        // сырой interkh: манифесты — на учёт ротации; сегменты — подмена
+        if (wdIsManifestUrl(url)) {
+          wdNoteManifestUrl(proxied);
+        } else {
+          var freshUpF = wdFreshenUpstream(url);
+          if (freshUpF) {
+            log('Stale token → fresh (fetch):', url.slice(0, 70));
+            proxied = toProxyUrl(freshUpF) || proxied;
+          }
+        }
+      } else if (typeof url === 'string' && url.indexOf(PROXY_MARK) === 0) {
+        var upF = upstreamFromProxy(url);
+        if (upF) {
+          if (wdIsManifestUrl(upF)) {
+            wdNoteManifestUrl(url);
+            proxied = url; // учтён; уходит как есть
+          } else {
+            var freshUpF2 = wdFreshenUpstream(upF);
+            if (freshUpF2) {
+              log('Stale token → fresh (fetch, pre-proxied)');
+              proxied = MEDIA_PROXY + encForPath(freshUpF2);
+            } else {
+              proxied = url; // как есть, но с учётом ошибок сегментов
+            }
+          }
+        }
+      }
+      if (proxied) {
+        if (proxied !== url) log('fetch → media proxy:', url.slice(0, 70));
+        if (proxied !== url) {
+          if (typeof input === 'string') {
+            input = proxied;
+          } else if (input && input.url) {
+            input = new Request(proxied, input);
+          }
         }
         return origFetch.call(this, input, init).then(function(res) {
           if (res && res.status >= 400 && segErrorSink) segErrorSink();
@@ -347,10 +521,15 @@
         var manifestish = ct.indexOf('dash+xml') !== -1 || ct.indexOf('xml') !== -1 ||
           ct.indexOf('mpegurl') !== -1 || /\.(mpd|m3u8)(\?|$)/i.test(finalUrl);
         if (!manifestish) return res;
+        // v211: клон ДО чтения тела — если перезапись не изменит текст,
+        // вернём НЕСЪЕДЕННЫЙ клон (раньше возвращали res с уже прочитанным
+        // телом — у вызывающего падало «body stream already read»)
+        var tee = null;
+        try { tee = res.clone(); } catch (_) {}
         return res.text().then(function(text) {
-          if (text.indexOf('<MPD') === -1 && text.indexOf('#EXTM3U') === -1) return res;
+          if (text.indexOf('<MPD') === -1 && text.indexOf('#EXTM3U') === -1) return tee || res;
           var rewritten = rewriteManifest(text, finalUrl);
-          if (rewritten === text) return res; // no-op → preserve Response.url
+          if (rewritten === text) return tee || res; // no-op → preserve Response.url
           log('Manifest body → media proxy (fetch)');
           var h = new Headers(res.headers);
           try { h.delete('content-length'); } catch(_) {}
@@ -378,10 +557,44 @@
       // это главный горячий путь видеосегментов.
       if (typeof url === 'string') {
         var proxied = toProxyUrl(url);
+        var isProxiedReq = false;
         if (proxied) {
+          // сырой interkh: манифесты — на учёт ротации; сегменты — подмена
+          if (wdIsManifestUrl(url)) {
+            wdNoteManifestUrl(proxied);
+          } else {
+            var freshUpX = wdFreshenUpstream(url);
+            if (freshUpX) {
+              log('Stale token → fresh (XHR):', url.slice(0, 70));
+              url = freshUpX;
+              proxied = toProxyUrl(freshUpX) || proxied;
+            }
+          }
           log('XHR → media proxy:', url.slice(0, 70));
           arguments[1] = proxied;
-          this._filmotivUrl = proxied;
+          url = proxied;
+          isProxiedReq = true;
+        } else if (url.indexOf(PROXY_MARK) === 0) {
+          // v211: УЖЕ ПРОКСИРОВАННЫЙ URL — главный путь dash.js (сегменты из
+          // переписанного сервером манифеста). Подмена протухшего токена
+          // свежим + учёт манифестов (вариантные плейлисты) + счёт ошибок.
+          var upX = upstreamFromProxy(url);
+          if (upX) {
+            if (wdIsManifestUrl(upX)) {
+              wdNoteManifestUrl(url);
+            } else {
+              var freshUpX2 = wdFreshenUpstream(upX);
+              if (freshUpX2) {
+                log('Stale token → fresh (XHR, pre-proxied)');
+                url = MEDIA_PROXY + encForPath(freshUpX2);
+                arguments[1] = url;
+              }
+            }
+          }
+          isProxiedReq = true;
+        }
+        if (isProxiedReq) {
+          this._filmotivUrl = url;
           var segErrXhr = this;
           segErrXhr.addEventListener('load', function() {
             if (segErrXhr.status >= 400 && segErrorSink) segErrorSink();
@@ -659,7 +872,13 @@
     var wdNudges = 0;
     var wdLastCriticalAt = 0;
     var wdSegErrors = 0;
-    segErrorSink = function() { wdSegErrors++; };
+    segErrorSink = function() {
+      wdSegErrors++;
+      // v211: реактивная ротация токенов — карта свежих query обновится,
+      // и ПОВТОРНЫЕ запросы сегментов (свои ретраи dash.js, наши nudge)
+      // уйдут уже с живым токеном. Анти-дребезг внутри wdRotateTokens.
+      try { wdRotateTokens('segerror'); } catch (_) {}
+    };
 
     video.addEventListener('seeking', function() {
       // скраб пользователя или наш nudge — «часы замирания» заново
