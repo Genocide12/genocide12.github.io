@@ -84,7 +84,7 @@
     </noscript>
   </div>
   <script>
-  // GH Pages router for Genopoisk (v182).
+  // GH Pages router for Genopoisk (v188).
   //
   // WHY: *.vercel.app lives on a rotating anycast IP pool that RU TSPU blocks
   // per-ISP (IP lottery — some projects open, some don't, changes every DNS
@@ -96,12 +96,22 @@
   // browser (the only vantage point that matters — the user's own network),
   // then hand off to the first live one, preserving the app path (?to=),
   // query and the Telegram webview hash (#tgWebAppData=...).
+  //
+  // v188 — TWO ROUTING PROFILES:
+  //   * Mini App launches (hash carries tgWebAppData): vercel.app FIRST.
+  //     The Mini App is used through Telegram, which in RU needs a VPN —
+  //     and through a VPN vercel.app is always reachable. duckdns stays as
+  //     the fallback for non-VPN webview users.
+  //   * Plain browsers: duckdns FIRST (clean from RU, no VPN needed),
+  //     vercel.app as fallback. Same as before.
   (function () {
     'use strict';
 
-    // Priority order. genopoisk.duckdns.org is preferred once it exists;
-    // until DNS is set up the probe fails fast and we fall back to vercel.app.
-    var HOSTS = [
+    var WEBVIEW_HOSTS = [
+      'https://genopoisk.vercel.app',
+      'https://genopoisk.duckdns.org'
+    ];
+    var BROWSER_HOSTS = [
       'https://genopoisk.duckdns.org',
       'https://genopoisk.vercel.app'
     ];
@@ -134,8 +144,15 @@
     }
 
     // Telegram webview appends its payload as the URL hash (#tgWebAppData=…).
-    // It MUST survive the handoff or the Mini App loses auth.
+    // It MUST survive the handoff or the Mini App loses auth. It ALSO tells
+    // us this is a Mini App launch → route to vercel.app (see header).
     function targetHash() { return window.location.hash || ''; }
+    function isWebview() { return window.location.hash.indexOf('tgWebAppData') !== -1; }
+
+    function hostsForThisLaunch() {
+      if (isWebview()) return WEBVIEW_HOSTS.slice(); // deterministic: vercel first, no pref juggling
+      return orderedHosts(BROWSER_HOSTS);
+    }
 
     function probe(host) {
       return new Promise(function (resolve) {
@@ -143,11 +160,10 @@
         var ctl = ('AbortController' in window) ? new AbortController() : null;
         function finish(v) { if (done) return; done = true; clearTimeout(timer); resolve(v); }
         var timer = setTimeout(function () { ctl && ctl.abort(); finish(null); }, PROBE_TIMEOUT);
-        // redirect:'manual' — genopoisk.vercel.app теперь (v184) 307-редиректит
-        // на duckdns на уровне edge; без этого проб «прошёл» бы через редирект
-        // и роутер зря предпочёл vercel (лишний хоп). Честная семантика:
-        // победить может только хост, который ОТВЕЧАЕТ сам (opaqueredirect →
-        // not ok → следующая попытка).
+        // redirect:'manual' — честная семантика: победить может только хост,
+        // который ОТВЧАЕТ сам (307/opaqueredirect → not ok → следующая
+        // попытка). С v188 оба хоста отвечают сами — проба различает живой
+        // деплой от упавшего.
         fetch(host + PROBE, { cache: 'no-store', mode: 'cors', redirect: 'manual', signal: ctl ? ctl.signal : undefined })
           .then(function (r) { return r.ok ? r.json() : null; })
           .then(function (j) { finish(j && j.service === 'genopoisk' ? host : null); })
@@ -155,8 +171,8 @@
       });
     }
 
-    function orderedHosts() {
-      var list = HOSTS.slice();
+    function orderedHosts(base) {
+      var list = base.slice();
       try {
         var pref = localStorage.getItem(LS_KEY);
         if (pref && list.indexOf(pref) > 0) {
@@ -177,7 +193,7 @@
 
     function nextRound() {
       round++;
-      var list = orderedHosts();
+      var list = hostsForThisLaunch();
       var i = 0;
       function next() {
         if (i >= list.length) {
